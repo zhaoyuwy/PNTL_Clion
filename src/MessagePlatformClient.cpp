@@ -7,7 +7,7 @@
 #include <sstream>
 #include <string>
 #include <stdlib.h>
-
+#include <iostream>
 using namespace std;
 
 #include "Log.h"
@@ -17,7 +17,8 @@ using namespace std;
 
 // http 请求处理超时时间,单位s, 避免因为Server未响应数据导致挂死
 #define AGENT_REQUEST_TIMEOUT 30
-
+std::string GetTokenString();
+std::string getPostToken();
 size_t ReceiveResponce(void *ptr, size_t size, size_t nmemb, stringstream *pssResponce)
 {
     char * pStr = (char *)ptr;
@@ -45,37 +46,6 @@ size_t ReceiveResponce(void *ptr, size_t size, size_t nmemb, stringstream *pssRe
 const CHAR* ACCEPT_TYPE = "Accept:application/json";
 const CHAR* CONTENT_TYPE = "Content-Type:application/json";
 
-
-INT32 GetKafkaAccessToken(stringstream * tokenOne,stringstream * tokenTwo,stringstream *pssResponceData)
-{
-
-    INT32 iRet = AGENT_OK;
-    string strTemp;
-
-    CURL *curl;
-    CURLcode res;
-    char error_msg[CURL_ERROR_SIZE];
-    struct curl_slist *headers = NULL;
-    curl_global_init(CURL_GLOBAL_ALL);
-
-    // 创建一个curl句柄
-    curl = curl_easy_init();
-
-    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-
-
-    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0);
-
-    // 设定超时时间, 避免因为SERVER无响应而挂死.
-    res = curl_easy_setopt(curl, CURLOPT_TIMEOUT, AGENT_REQUEST_TIMEOUT);
-    if(CURLE_OK != res)
-    {
-        MSG_CLIENT_ERROR("curl easy setopt CURLOPT_TIMEOUT failed[%d][%s],detail info[%s]", res, curl_easy_strerror(res), error_msg);
-        curl_easy_cleanup(curl);
-        curl_global_cleanup();
-        return AGENT_E_ERROR;
-    }
-}
 
 // 通过http post操作提交数据
 INT32 HttpPostData(stringstream * pssUrl, stringstream * pssPostData, stringstream *pssResponceData)
@@ -109,10 +79,15 @@ INT32 HttpPostData(stringstream * pssUrl, stringstream * pssPostData, stringstre
             MSG_CLIENT_WARNING("curl easy setopt CURLOPT_ERRORBUFFER failed[%d][%s]", res, curl_easy_strerror(res));
         }
 
-        headers = curl_slist_append(headers, ACCEPT_TYPE);
-        headers = curl_slist_append(headers, CONTENT_TYPE);
-        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
 
+        string tokenstring ="Authorization:Bearer "+GetTokenString();
+
+        headers = curl_slist_append(headers, tokenstring.c_str());
+        headers = curl_slist_append(headers, "user_name:c00000000");
+        headers = curl_slist_append(headers, "service_name:pntl");
+        headers = curl_slist_append(headers, "Content-Type:application/json");
+        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+        curl_easy_setopt(curl,CURLOPT_SSL_VERIFYPEER,0);
         // 设定超时时间, 避免因为SERVER无响应而挂死.
         res = curl_easy_setopt(curl, CURLOPT_TIMEOUT, AGENT_REQUEST_TIMEOUT);
         if(CURLE_OK != res)
@@ -132,7 +107,10 @@ INT32 HttpPostData(stringstream * pssUrl, stringstream * pssPostData, stringstre
         strTemp = pssUrl->str();
         sal_string_replace(&strTemp, &strOld, &strNew);
         MSG_CLIENT_INFO("URL:[%s]", strTemp.c_str());
+//        res = curl_easy_setopt(curl, CURLOPT_URL, "\"https://cas.lf.hwclouds.com:8243/Kafka/v1/mq/pntl\"");
         res = curl_easy_setopt(curl, CURLOPT_URL, strTemp.c_str());
+        cout <<"###################################"<<strTemp.c_str()<<endl;
+
         if(CURLE_OK != res)
         {
             MSG_CLIENT_ERROR("curl easy setopt CURLOPT_URL failed[%d][%s],detail info[%s]", res, curl_easy_strerror(res), error_msg);
@@ -205,7 +183,7 @@ INT32 HttpPostData(stringstream * pssUrl, stringstream * pssPostData, stringstre
     return iRet;
 }
 
-const string HTTP_PREFIX = "http://";
+const string HTTP_PREFIX = "https://";
 const string COLON = ":";
 
 // 向ServerAnrServer请求新的probe列表
@@ -290,4 +268,77 @@ INT32 ReportAgentIPToServer(ServerAntAgentCfg_C * pcAgentCfg)
     // 处理response数据
     MSG_CLIENT_INFO("Responce [%s]", strResponceData.c_str());
     return iRet;
+}
+
+
+
+size_t CurlWrite_CallbackFunc_StdString(void *contents, size_t size, size_t nmemb, std::string *s)
+{
+    size_t newLength = size*nmemb;
+    size_t oldLength = s->size();
+    try
+    {
+        s->resize(oldLength + newLength);
+    }
+    catch(std::bad_alloc &e)
+    {
+        //handle memory problem
+        return 0;
+    }
+
+    std::copy((char*)contents,(char*)contents+newLength,s->begin()+oldLength);
+    return size*nmemb;
+}
+
+std::string getPostToken()
+{
+    CURL *curl;
+    CURLcode res;
+
+    struct curl_slist *headers = NULL;
+
+    headers = curl_slist_append(headers, "Authorization:basic NWVfeG9fOThOTlhEYUZ0RmU1STFPbkVmX3QwYTo4RWYwVGRwazA3aEFBTnNzR1RaZm1zOHAwVEVh");
+    headers = curl_slist_append(headers, "user_name:c00000000");
+    headers = curl_slist_append(headers, "service_name:pntl");
+    headers = curl_slist_append(headers, "Content-Type:application/x-www-form-urlencoded");
+
+    curl = curl_easy_init();
+    std::string s_post_return;
+
+    if(curl)
+    {
+        res= curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+        res = curl_easy_setopt(curl,CURLOPT_POSTFIELDS,"grant_type=client_credentials");
+
+        res= curl_easy_setopt(curl,CURLOPT_URL,"https://cas.lf.hwclouds.com:8243/token");
+        res= curl_easy_setopt(curl,CURLOPT_SSL_VERIFYPEER,0);
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, CurlWrite_CallbackFunc_StdString);
+        res = curl_easy_setopt(curl,CURLOPT_WRITEDATA,&s_post_return);
+//        curl_easy_setopt (curl, CURLOPT_VERBOSE, 1L); //remove this to disable verbose output
+
+
+
+        res = curl_easy_perform(curl);
+
+
+        curl_easy_cleanup(curl);
+    }
+    return s_post_return;
+
+}
+
+
+string GetTokenString(){
+    istringstream iss;
+
+    std::string s_post_return;
+
+    s_post_return = getPostToken();
+    iss.str(s_post_return);
+
+    ptree item;
+    read_json(iss,item);
+
+    string n = item.get<string>("access_token");
+    return n;
 }
