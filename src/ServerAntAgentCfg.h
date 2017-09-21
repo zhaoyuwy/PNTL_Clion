@@ -49,6 +49,7 @@ private:
     /* Detect 协议控制参数 */
     ServerAntAgentProtocolUDP_S stProtocolUDP; // UDP 探测报文全局设定,包括源端口范围及目的端口信息.
     string kafkaIp;
+    string kafkaBasicToken;
     string topic;
     UINT32 dropPkgThresh;
     UINT32 bigPkgSize;
@@ -114,6 +115,9 @@ public:
 
     string GetKafkaIp();
     void SetKafkaIp(string newIp);
+
+    string GetKafkaBasicToken();
+    void SetKafkaBasicToken(string newIp);
 
     string GetTopic();
 

@@ -212,6 +212,14 @@ void ServerAntAgentCfg_C::SetKafkaIp(string newIp)
     kafkaIp = newIp;
 }
 
+string ServerAntAgentCfg_C::GetKafkaBasicToken(){
+    return kafkaBasicToken;
+}
+void ServerAntAgentCfg_C::SetKafkaBasicToken(string newBasicToken){
+    kafkaBasicToken = newBasicToken;
+
+}
+
 string ServerAntAgentCfg_C::GetTopic()
 {
     return topic;

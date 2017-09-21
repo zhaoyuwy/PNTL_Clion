@@ -184,6 +184,7 @@ INT32 HttpPostData(stringstream * pssUrl, stringstream * pssPostData, stringstre
 }
 
 const string HTTP_PREFIX = "https://";
+const string BASIC_TOKEN_PREFIX = "basic ";
 const string COLON = ":";
 
 // 向ServerAnrServer请求新的probe列表
@@ -195,11 +196,17 @@ INT32 ReportDataToServer(ServerAntAgentCfg_C *pcAgentCfg, stringstream * pstrRep
     stringstream ssUrl;
     // 保存post的response(查询结果),json格式字符串, 后续交给json模块处理.
     stringstream ssResponceData;
+
     const char * pcJsonData = NULL;
 
     ssUrl.clear();
     ssUrl << HTTP_PREFIX << pcAgentCfg->GetKafkaIp() << strUrl;
 
+    stringstream ssBasicToken;
+    ssBasicToken.clear();
+    ssBasicToken<< pcAgentCfg->GetKafkaBasicToken();
+
+    cout<<"######################################## basicToken" << ssBasicToken<<endl;
     ssResponceData.clear();
     ssResponceData.str("");
     iRet = HttpPostData(&ssUrl, pstrReportData, &ssResponceData);

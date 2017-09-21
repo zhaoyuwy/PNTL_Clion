@@ -2,8 +2,8 @@
 // Created by zy on 17-9-15.
 //
 #include "Log.h"
-#include "AgentCommon.h"
 #include "AgentJsonAPI.h"
+#include <iostream>
 
 /*
 {
@@ -508,9 +508,23 @@ INT32 ParseLocalAgentConfig(const char * pcJsonData, FlowManager_C * pcFlowManag
         pcFlowManager->pcAgentCfg->SetDetectTimeout(data);
         JSON_PARSER_INFO("Current lossPkg_timeout is [%u].", pcFlowManager->pcAgentCfg->GetDetectTimeout());
 
+
+
         strTemp = ptDataRoot.get<string>("kafka_ip");
         pcFlowManager->pcAgentCfg->SetKafkaIp(strTemp);
         JSON_PARSER_INFO("Current kafka_ip is [%s].", pcFlowManager->pcAgentCfg->GetKafkaIp().c_str());
+
+
+
+
+        strTemp = ptDataRoot.get<string>("basicToken");
+        std::cout<<"######################################## basicToken" << strTemp<<std::endl;
+
+
+        pcFlowManager->pcAgentCfg->SetKafkaBasicToken(strTemp);
+        std::cout<<"######################################## basicToken" << strTemp<<std::endl;
+        JSON_PARSER_INFO("Current kafkaBasicToken is [%u].", pcFlowManager->pcAgentCfg->GetKafkaBasicToken().c_str());
+
 
         strTemp = ptDataRoot.get<string>("topic");
         pcFlowManager->pcAgentCfg->SetTopic(strTemp);
