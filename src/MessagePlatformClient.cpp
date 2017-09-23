@@ -11,7 +11,6 @@ using namespace std;
 
 #include "Log.h"
 #include "AgentJsonAPI.h"
-#include "ServerAntAgentCfg.h"
 #include "MessagePlatformClient.h"
 
 // http 请求处理超时时间,单位s, 避免因为Server未响应数据导致挂死

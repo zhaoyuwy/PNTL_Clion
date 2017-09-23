@@ -20,6 +20,7 @@ ServerAntAgentCfg_C::ServerAntAgentCfg_C()
 
     /* Agent 全局周期控制 */
     uiAgentPollingTimerPeriod   = 100000;   // Agent Polling周期, 单位为us, 默认100ms, 用于设定Agent定时器.
+    uiAgentPollingTimerPeriod   = 10;   // Agent Polling周期, 单位为us, 默认100ms, 用于设定Agent定时器.
     uiAgentReportPeriod         = 3000;     // Agent向Collector上报周期, 单位Polling周期, 默认3000(300s, 5分钟).
     uiAgentQueryPeriod          = 9000;     // Agent向Server查询周期, 单位Polling周期, 默认36000(3600s, 1小时).
     // 当前Agent探测列表为空时, 查询周期会缩短为该值的1/1000, 最小间隔为300(30s).

@@ -173,7 +173,7 @@ typedef struct tagDetectWorkerSession
     PacketTime_S    stT3;                //时间戳信息, 应答报文从Target出发的时间.
     PacketTime_S    stT4;                //时间戳信息, 应答报文到达Sender的时间.
 } DetectWorkerSession_S;
-
+#define PACKET_SIZE     4096
 // DetectWorker类定义,负责探测报文发送和接收.
 class DetectWorker_C : ThreadClass_C
 {
@@ -215,6 +215,20 @@ public:
     INT32 PopSession(DetectWorkerSession_S*
     pOldSession);               // 查询探测结果, FlowManage使用.
 
+    int packIcmp(int pack_no, struct icmp* icmp);
+    unsigned short getChksum(unsigned short *addr,int len);
+    bool sendPacket();
+    INT32 m_nsend;
+    INT32 m_icmp_seq ;
 
+    char m_sendpacket[PACKET_SIZE];
+    char m_recvpacket[PACKET_SIZE];
+    int m_maxPacketSize;
+    int m_sockfd;
+    int m_datalen;
+    int m_nreceived;
+    struct sockaddr_in m_dest_addr;
+    struct sockaddr_in m_from_addr;
+    pid_t m_pid;
 };
 #endif //PNTL_AGENT_DETECTWORKER_H

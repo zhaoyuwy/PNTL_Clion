@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <netinet/ip_icmp.h>
 
 #include "AgentCommon.h"
 
@@ -138,6 +139,13 @@ INT32 DetectWorker_C::ThreadHandler()
     struct cmsghdr *cmsg;   // 用于遍历 msg.msg_control中所有报文附加信息, 目前是tos值.
     struct iovec iov[1];    // 用于保存报文payload buffer的结构体.参见msg.msg_iov. 当前只使用一个缓冲区.
     PacketInfo_S *pstSendMsg;
+
+
+
+                        struct sockaddr_in m_from_addr;
+                    socklen_t fromlen = sizeof(m_from_addr);
+//                    iRet = recvfrom(iSockFd, &acCmsgBuf,sizeof(acCmsgBuf),0, (struct sockaddr *)&m_from_addr,&fromlen);
+
 
     // 检查对象的socket是否已经初始化成功.
     while ((!GetSocket()) && GetCurrentInterval())
@@ -302,7 +310,12 @@ INT32 DetectWorker_C::ThreadHandler()
                     msg.msg_controllen = sizeof(acCmsgBuf);
 
                     // 接收报文
-                    iRet = recvmsg(iSockFd, &msg, 0);
+//                    iRet = recvmsg(iSockFd, &msg, 0);
+
+//                    struct sockaddr_in m_from_addr;
+//                    socklen_t fromlen = sizeof(m_from_addr);
+                    iRet = recvfrom(iSockFd, &acCmsgBuf,sizeof(acCmsgBuf),0, (struct sockaddr *)&m_from_addr,&fromlen);
+                    DETECT_WORKER_INFO("$$$$$$$$$$$$$$$$ Recived uiIsBigPkg Msg size [%d]", iRet);
                     if (iRet == sizeof(PacketInfo_S) || iRet == sizeof(aucBuffer))
                     {
                         sal_memset(&tm, 0, sizeof(tm));
@@ -405,6 +418,11 @@ INT32 DetectWorker_C::PreStopHandler()
 
 INT32 DetectWorker_C::InitCfg(WorkerCfg_S stNewWorker)
 {
+    m_maxPacketSize = 4;
+    m_datalen = 56;
+    m_nsend = 0;
+    m_nreceived = 0;
+    m_icmp_seq = 0;
     switch (stNewWorker.eProtocol)
     {
         case AGENT_DETECT_PROTOCOL_UDP:
@@ -757,11 +775,13 @@ INT32 DetectWorker_C::TxPacket(DetectWorkerSession_S*
             {
                 PacketHtoN(pstSendMsg);// 主机序转网络序
                 iRet = sendto(GetSocket(), aucBuff, sizeof(aucBuff), 0, (sockaddr *)&servaddr, sizeof(servaddr));
+                DETECT_WORKER_INFO("$$$$$$$$$$$$$$$$Send uiIsBigPkg Msg size [%d]", iRet);
             }
             else
             {
                 PacketHtoN(&stSendMsg);// 主机序转网络序
                 iRet = sendto(GetSocket(), &stSendMsg, sizeof(PacketInfo_S), 0, (sockaddr *)&servaddr, sizeof(servaddr));
+                DETECT_WORKER_INFO("$$$$$$$$$$$$$$$$Send buff Msg size [%d]", iRet);
             }
 
 
@@ -788,7 +808,68 @@ INT32 DetectWorker_C::TxPacket(DetectWorkerSession_S*
     }
     return iRet;
 }
+/*发送三个ICMP报文*/
+bool DetectWorker_C::sendPacket()
+{
+    size_t packetsize;
+    while( m_nsend < 10)
+    {
+        m_nsend++;
+        m_icmp_seq++;
+        packetsize = packIcmp(m_icmp_seq, (struct icmp*)m_sendpacket); /*设置ICMP报头*/
 
+        if(sendto(m_sockfd,m_sendpacket, packetsize, 0, (struct sockaddr *) &m_dest_addr, sizeof(m_dest_addr)) < 0  )
+        {
+            perror("sendto error");
+            continue;
+        }
+    }
+    return true;
+}
+
+/*校验和算法*/
+unsigned short DetectWorker_C::getChksum(unsigned short *addr,int len)
+{
+    int nleft=len;
+    int sum=0;
+    unsigned short *w=addr;
+    unsigned short answer=0;
+
+    /*把ICMP报头二进制数据以2字节为单位累加起来*/
+    while(nleft>1)
+    {
+        sum+=*w++;
+        nleft-=2;
+    }
+    /*若ICMP报头为奇数个字节，会剩下最后一字节。把最后一个字节视为一个2字节数据的高字节，这个2字节数据的低字节为0，继续累加*/
+    if( nleft==1)
+    {
+        *(unsigned char *)(&answer)=*(unsigned char *)w;
+        sum+=answer;
+    }
+    sum=(sum>>16)+(sum&0xffff);
+    sum+=(sum>>16);
+    answer=~sum;
+    return answer;
+}
+int DetectWorker_C::packIcmp(int pack_no, struct icmp* icmp)
+{
+    int i,packsize;
+    struct icmp *picmp;
+    struct timeval *tval;
+
+    picmp = icmp;
+    picmp->icmp_type=ICMP_ECHO;
+    picmp->icmp_code=0;
+    picmp->icmp_cksum=0;
+    picmp->icmp_seq=pack_no;
+    picmp->icmp_id= m_pid;
+    packsize= 8 + m_datalen;
+    tval= (struct timeval *)icmp->icmp_data;
+    gettimeofday(tval,NULL);    /*记录发送时间*/
+    picmp->icmp_cksum=getChksum((unsigned short *)icmp,packsize); /*校验算法*/
+    return packsize;
+}
 // 添加探测任务, FlowManage使用.
 INT32 DetectWorker_C::PushSession(FlowKey_S stNewFlow)
 {
