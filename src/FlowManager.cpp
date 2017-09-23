@@ -138,7 +138,8 @@ INT32 FlowManager_C::Init(ServerAntAgentCfg_C * pcNewAgentCfg)
     pcAgentCfg->GetProtocolUDP(&uiSrcPortMin, &uiSrcPortMax, &uiDestPort);
 
     sal_memset(&stNewWorker, 0, sizeof(stNewWorker));
-    stNewWorker.eProtocol  = AGENT_DETECT_PROTOCOL_UDP;
+//    stNewWorker.eProtocol  = AGENT_DETECT_PROTOCOL_UDP;
+    stNewWorker.eProtocol  = AGENT_DETECT_PROTOCOL_ICMP;
     stNewWorker.uiSrcPort   = uiSrcPortMin;
     stNewWorker.uiSrcIP     = SAL_INADDR_ANY;
 
@@ -363,7 +364,8 @@ INT32 FlowManager_C::ServerFlowTablePreAdd(ServerFlowKey_S * pstNewServerFlowKey
 
     sal_memset(pstNewServerFlowEntry, 0, sizeof(ServerFlowTableEntry_S));
 
-    if (AGENT_DETECT_PROTOCOL_UDP == pstNewServerFlowKey->eProtocol)
+    if (AGENT_DETECT_PROTOCOL_UDP == pstNewServerFlowKey->eProtocol||
+            AGENT_DETECT_PROTOCOL_ICMP == pstNewServerFlowKey->eProtocol)
     {
         // 获取当前Agent全局源端口范围.
         pcAgentCfg->GetProtocolUDP(&uiSrcPortMin, &uiSrcPortMax, &uiDestPort);
@@ -508,6 +510,28 @@ INT32 FlowManager_C::DoDetect()
             // 只处理enable的Entry
             if (FLOW_ENTRY_STATE_CHECK(pAgentFlowEntry->uiFlowState, FLOW_ENTRY_STATE_ENABLE))
             {
+                // 检查越界,避免踩内存.
+                if (NULL !=  WorkerList_UDP)
+                {
+                    stFlowKey = pAgentFlowEntry->stFlowKey;
+                    iRet = WorkerList_UDP->PushSession(stFlowKey);
+
+                    if (iRet && AGENT_E_SOCKET != iRet)
+                    {
+                        FLOW_MANAGER_ERROR("Push Session to Worker Failed[%d], SrcPort[%u]", iRet, pAgentFlowEntry->stFlowKey.uiSrcPort);
+                        continue;
+                    }
+                }
+                else
+                {
+                    FLOW_MANAGER_ERROR("UDP  is over udp worker list, SrcPort[%u].", pAgentFlowEntry->stFlowKey.uiSrcPort);
+                    continue;
+                }
+            }
+        }
+        else if(AGENT_DETECT_PROTOCOL_ICMP == pAgentFlowEntry->stFlowKey.eProtocol){
+            // add ICMP  只处理enable的Entry
+            if (FLOW_ENTRY_STATE_CHECK(pAgentFlowEntry->uiFlowState, FLOW_ENTRY_STATE_ENABLE)){
                 // 检查越界,避免踩内存.
                 if (NULL !=  WorkerList_UDP)
                 {
@@ -1118,7 +1142,8 @@ INT32 FlowManager_C::ThreadHandler()
 
         if (QueryReportCheck(&SHOULD_REPORT_IP, counter, uiLastReportIpCounter, &uiReportIpFailCounter))
         {
-            iRet = ReportAgentIPToServer(this->pcAgentCfg);
+//            liantiao pingbi
+//            iRet = ReportAgentIPToServer(this->pcAgentCfg);
             if (iRet)
             {
                 uiLastReportIpCounter = counter;

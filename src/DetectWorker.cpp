@@ -285,6 +285,95 @@ INT32 DetectWorker_C::ThreadHandler()
                         }
                     }
                     break;
+//                    add ICMP
+                case AGENT_DETECT_PROTOCOL_ICMP:
+                    // 清空对端地址, payload buffer.
+                    sal_memset(&stPrtnerAddr, 0, sizeof(stPrtnerAddr));
+                    sal_memset(&stSendMsg, 0, sizeof(PacketInfo_S));
+                    sal_memset(acCmsgBuf, 0, sizeof(acCmsgBuf));
+                    iTos = 0;
+
+                    /*
+                       老版本的Linux kernel, sendmsg时不支持设定tos, recvmsg支持获取tos.
+                       为了兼容老版本, sendmsg时去除msg_control信息, recvmsg时添加msg_control信息.
+                    */
+                    // 报文附加信息buffer
+                    msg.msg_control = acCmsgBuf;
+                    msg.msg_controllen = sizeof(acCmsgBuf);
+
+                    // 接收报文
+                    iRet = recvmsg(iSockFd, &msg, 0);
+                    if (iRet == sizeof(PacketInfo_S) || iRet == sizeof(aucBuffer))
+                    {
+                        sal_memset(&tm, 0, sizeof(tm));
+                        gettimeofday(&tm,NULL); //获取当前时间
+
+                        // 获取报文中附带的tos信息.
+                        cmsg = CMSG_FIRSTHDR(&msg);
+                        if (cmsg == NULL)
+                        {
+                            DETECT_WORKER_WARNING("RX: Socket can not get cmsg\n");
+                            continue;
+                        }
+                        if ((cmsg->cmsg_level != SOL_IP) ||
+                            (cmsg->cmsg_type != IP_TOS))
+                        {
+                            DETECT_WORKER_WARNING("RX: Cmsg is not IP_TOS, cmsg_level[%d], cmsg_type[%d]",
+                                                  cmsg->cmsg_level, cmsg->cmsg_type);
+                            continue;
+                        }
+                        iTos = ((INT32 *) CMSG_DATA(cmsg))[0];
+
+
+                        PacketNtoH(pstSendMsg);
+
+                        if(WORKER_ROLE_SERVER == pstSendMsg->uiRole)
+                        {
+                            pstSendMsg->stT4.uiSec = tm.tv_sec;
+                            pstSendMsg->stT4.uiUsec = tm.tv_usec;
+                            iRet = RxUpdateSession(pstSendMsg); //刷新sender的会话列表
+
+                            // 若应答报文返回的太晚(Timeout), Sender会话列表已经删除会话, 会返回找不到.
+                            if ((AGENT_OK!= iRet) && (AGENT_E_NOT_FOUND != iRet))
+                                DETECT_WORKER_WARNING("RX: Update Session failed. iRet:[%d]", iRet);
+                        }
+                        else if(WORKER_ROLE_CLIENT == pstSendMsg->uiRole)
+                        {
+                            /*
+                               老版本的Linux kernel, sendmsg时不支持设定tos, recvmsg支持获取tos.
+                               为了兼容老版本, sendmsg时去除msg_control信息, recvmsg时添加msg_control信息.
+                            */
+                            msg.msg_control = NULL;
+                            msg.msg_controllen = 0;
+
+                            // IP_TOS对于stream(TCP)socket不会修改ECN bit, 其他情况下会覆盖ip头中整个tos字段
+                            iRet = setsockopt(iSockFd, SOL_IP, IP_TOS, &iTos, sizeof(iTos));
+                            if( 0 > iRet)
+                            {
+                                DETECT_WORKER_WARNING("RX: Setsockopt IP_TOS failed[%d]: %s [%d]", iRet, strerror(errno), errno);
+                                continue;
+                            }
+
+                            sal_memset(&tm, 0, sizeof(tm));
+                            gettimeofday(&tm,NULL); //获取当前时间
+
+                            pstSendMsg->stT2.uiSec = tm.tv_sec;
+                            pstSendMsg->stT2.uiUsec = tm.tv_usec;
+                            pstSendMsg->stT3.uiSec = tm.tv_sec;
+                            pstSendMsg->stT3.uiUsec = tm.tv_usec;
+                            pstSendMsg->uiRole = WORKER_ROLE_SERVER;
+                            PacketHtoN(pstSendMsg); // 报文payload主机序转网络序
+
+
+                            iRet = sendmsg(iSockFd, &msg, 0);
+                            if (iRet != sizeof(PacketInfo_S) && iRet != sizeof(aucBuffer)) // send failed
+                            {
+                                DETECT_WORKER_WARNING("RX: Send reply packet failed[%d]: %s [%d]", iRet, strerror(errno), errno);
+                            }
+                            sleep(0);
+                        }
+                    }
+                    break;
 
                 default :   //不支持的协议类型, 直接退出
                     DETECT_WORKER_ERROR("RX: Unsupported Protocol[%d]", stCfg.eProtocol);
@@ -319,6 +408,21 @@ INT32 DetectWorker_C::InitCfg(WorkerCfg_S stNewWorker)
     switch (stNewWorker.eProtocol)
     {
         case AGENT_DETECT_PROTOCOL_UDP:
+            if (0 == stNewWorker.uiSrcPort) // socket要绑定源端口, 端口号不能为0.
+            {
+                DETECT_WORKER_ERROR("SrcPort is 0");
+                return AGENT_E_PARA;
+            }
+            if (INADDR_NONE == stNewWorker.uiSrcIP) // socket要绑定源端口, 端口号不能为0.
+            {
+                DETECT_WORKER_ERROR("Invalid SrcIP");
+                return AGENT_E_PARA;
+            }
+
+            stCfg.uiSrcIP = stNewWorker.uiSrcIP;
+            stCfg.uiSrcPort    = stNewWorker.uiSrcPort;
+            break;
+        case AGENT_DETECT_PROTOCOL_ICMP:
             if (0 == stNewWorker.uiSrcPort) // socket要绑定源端口, 端口号不能为0.
             {
                 DETECT_WORKER_ERROR("SrcPort is 0");
@@ -443,6 +547,28 @@ INT32 DetectWorker_C::InitSocket()
             servaddr.sin_family = AF_INET;
             servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
             servaddr.sin_port = htons(uiDestPort);
+
+            if( bind(SocketTmp, (struct sockaddr*)&servaddr, sizeof(servaddr)) == -1)
+            {
+                DETECT_WORKER_WARNING("Bind socket failed, SrcIP[%s],SrcPort[%d]: %s [%d]",
+                                      sal_inet_ntoa(stCfg.uiSrcIP), stCfg.uiSrcPort, strerror(errno), errno);
+                close(SocketTmp);
+                return AGENT_E_SOCKET;
+            }
+            break;
+        case AGENT_DETECT_PROTOCOL_ICMP:
+//            const int val =255;
+            SocketTmp = socket(AF_INET, SOCK_RAW,IPPROTO_ICMP);
+            if( SocketTmp == -1 )
+            {
+                DETECT_WORKER_ERROR("Create socket failed[%d]: %s [%d]", SocketTmp, strerror(errno), errno);
+                return AGENT_E_MEMORY;
+            }
+            sal_memset(&servaddr, 0, sizeof(servaddr));
+            servaddr.sin_family = AF_INET;
+//            servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+            servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+            servaddr.sin_port = 0;
 
             if( bind(SocketTmp, (struct sockaddr*)&servaddr, sizeof(servaddr)) == -1)
             {
@@ -610,6 +736,52 @@ INT32 DetectWorker_C::TxPacket(DetectWorkerSession_S*
             }
             break;
 
+//          add ICMP pro
+        case AGENT_DETECT_PROTOCOL_ICMP:
+            servaddr.sin_family = AF_INET;
+            servaddr.sin_addr.s_addr = htonl(pNewSession->stFlowKey.uiDestIP);
+//            servaddr.sin_port = htons(pNewSession->stFlowKey.uiDestPort);
+            servaddr.sin_port = 0;
+
+            tos = (pNewSession->stFlowKey.uiDscp)<<2; //dscp左移2位, 变成tos
+            // IP_TOS对于stream(TCP)socket不会修改ECN bit, 其他情况下会覆盖ip头中整个tos字段
+            iRet = setsockopt(GetSocket(), SOL_IP, IP_TOS, &tos, sizeof(tos));
+            if( 0 > iRet )
+            {
+                DETECT_WORKER_ERROR("TX: Setsockopt IP_TOS failed[%d]: %s [%d]", iRet, strerror(errno), errno);
+                iRet = AGENT_E_PARA;
+                break;
+            }
+
+            if (pNewSession->stFlowKey.uiIsBigPkg)
+            {
+                PacketHtoN(pstSendMsg);// 主机序转网络序
+                iRet = sendto(GetSocket(), aucBuff, sizeof(aucBuff), 0, (sockaddr *)&servaddr, sizeof(servaddr));
+            }
+            else
+            {
+                PacketHtoN(&stSendMsg);// 主机序转网络序
+                iRet = sendto(GetSocket(), &stSendMsg, sizeof(PacketInfo_S), 0, (sockaddr *)&servaddr, sizeof(servaddr));
+            }
+
+
+            if (sizeof(PacketInfo_S) == iRet || iRet == sizeof(aucBuff)) //发送成功.
+            {
+                pNewSession->uiSessionState = SESSION_STATE_WAITING_REPLY;
+                iRet = TxUpdateSession(pNewSession);
+                if( iRet )
+                {
+                    DETECT_WORKER_WARNING("TX: Tx Update Session[%d]", iRet);
+                }
+            }
+            else //发送失败
+            {
+                DETECT_WORKER_ERROR("TX: Send Detect Packet failed[%d]: %s [%d]", iRet, strerror(errno), errno);
+                iRet = AGENT_E_ERROR;
+            }
+            break;
+
+
         default:
             DETECT_WORKER_ERROR("Unsupported Protocol[%d]", pNewSession->stFlowKey.eProtocol);
             iRet = AGENT_E_PARA;
@@ -661,7 +833,8 @@ INT32 DetectWorker_C::PushSession(FlowKey_S stNewFlow)
     {
         case AGENT_DETECT_PROTOCOL_UDP:
             break;
-
+        case AGENT_DETECT_PROTOCOL_ICMP:
+            break;
         default:
             DETECT_WORKER_ERROR("Unsupported Protocol[%d]", stNewFlow.eProtocol);
             return AGENT_E_PARA;

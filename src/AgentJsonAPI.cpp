@@ -431,7 +431,8 @@ INT32 GetFlowInfoFromConfigFile(string dip, ServerFlowKey_S * pstNewServerFlowKe
         sal_memset(pstNewServerFlowKey, 0, sizeof(ServerFlowKey_S));
 
         pstNewServerFlowKey->uiUrgentFlow = 0;
-        pstNewServerFlowKey->eProtocol = AGENT_DETECT_PROTOCOL_UDP;
+//        pstNewServerFlowKey->eProtocol = AGENT_DETECT_PROTOCOL_UDP;
+        pstNewServerFlowKey->eProtocol = AGENT_DETECT_PROTOCOL_ICMP;
         pstNewServerFlowKey->uiSrcIP = pcAgentCfg->GetAgentIP();
 
         pstNewServerFlowKey->uiDestIP = sal_inet_aton(dip.c_str());

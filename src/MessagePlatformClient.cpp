@@ -5,7 +5,6 @@
 
 #include <curl/curl.h>
 #include <sstream>
-#include <string>
 #include <stdlib.h>
 #include <iostream>
 using namespace std;
@@ -311,7 +310,7 @@ std::string getPostToken()
 
     curl = curl_easy_init();
     std::string s_post_return;
-
+    char error_msg[CURL_ERROR_SIZE];
     if(curl)
     {
         res= curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
@@ -324,9 +323,18 @@ std::string getPostToken()
 //        curl_easy_setopt (curl, CURLOPT_VERBOSE, 1L); //remove this to disable verbose output
 
 
-
+cout<<"$$$$$$$$$$$$$$$$$$$$$$$$$$$$$"<<endl;
         res = curl_easy_perform(curl);
+cout<<"$$$$$$$$$$$$$$$$$$$$$$$$$$$$$"<<endl;
 
+        if(CURLE_OK != res)
+        {
+            MSG_CLIENT_ERROR("curl easy perform failed[%d][%s],detail info[%s]", res, curl_easy_strerror(res), error_msg);
+            curl_easy_cleanup(curl);
+            curl_slist_free_all(headers);
+            curl_global_cleanup();
+            return "error";
+        }
 
         curl_easy_cleanup(curl);
     }
