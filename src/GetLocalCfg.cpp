@@ -16,26 +16,23 @@ using namespace std;
 const string AGENT_CONFIG_FILE_NAME = "agentConfig.cfg";
 const string AGENT_CONFIG_FILE_PATH = "/opt/huawei/ServerAntAgent";
 
-string GetJsonDataFromFile(string sFileName, string sFilePath)
-{
+string GetJsonDataFromFile(string sFileName, string sFilePath) {
 
-    INT32  iRet = AGENT_OK;
+    INT32 iRet = AGENT_OK;
     stringstream ssCfgFileName;
     ifstream ifsAgentCfg;
 
     ssCfgFileName << sFileName;
 
     ifsAgentCfg.open(ssCfgFileName.str().c_str());
-    if ( ifsAgentCfg.fail() )
-    {
+    if (ifsAgentCfg.fail()) {
         INIT_INFO("No cfg file[%s] in current dir, trying [%s] ...", sFileName.c_str(), sFilePath.c_str());
 
         ssCfgFileName.clear();
         ssCfgFileName.str("");
         ssCfgFileName << sFilePath << sFileName;
         ifsAgentCfg.open(ssCfgFileName.str().c_str());
-        if ( ifsAgentCfg.fail() )
-        {
+        if (ifsAgentCfg.fail()) {
             INIT_ERROR("Can't open cfg file[%s]", ssCfgFileName.str().c_str());
             return "";
         }
@@ -43,7 +40,7 @@ string GetJsonDataFromFile(string sFileName, string sFilePath)
 
     INIT_INFO("Using cfg file[%s]", ssCfgFileName.str().c_str());
 
-    string strCfgJsonData((istreambuf_iterator<char>(ifsAgentCfg)),  (istreambuf_iterator<char>()));
+    string strCfgJsonData((istreambuf_iterator<char>(ifsAgentCfg)), (istreambuf_iterator<char>()));
 
     ifsAgentCfg.close();
 
@@ -51,21 +48,18 @@ string GetJsonDataFromFile(string sFileName, string sFilePath)
 
 }
 
-INT32 GetLocalCfg(ServerAntAgentCfg_C * pcCfg)
-{
-    INT32  iRet = AGENT_OK;
+INT32 GetLocalCfg(ServerAntAgentCfg_C *pcCfg) {
+    INT32 iRet = AGENT_OK;
     string strCfgJsonData;
     stringstream ssCfgFileName;
 
     strCfgJsonData = GetJsonDataFromFile(SERVER_ANT_CFG_FILE_NAME, SERVER_ANT_CFG_FILE_PATH);
-    if ("" == strCfgJsonData)
-    {
+    if ("" == strCfgJsonData) {
         return AGENT_E_ERROR;
     }
 
     iRet = ParserLocalCfg(strCfgJsonData.c_str(), pcCfg);
-    if (iRet)
-    {
+    if (iRet) {
         INIT_ERROR("ParserLocalCfg failed[%d]", iRet);
         return AGENT_E_ERROR;
     }
@@ -73,22 +67,19 @@ INT32 GetLocalCfg(ServerAntAgentCfg_C * pcCfg)
     return AGENT_OK;
 }
 
-INT32 GetLocalAgentConfig(FlowManager_C * pcFlowManager)
-{
+INT32 GetLocalAgentConfig(FlowManager_C *pcFlowManager) {
 
-    INT32  iRet = AGENT_OK;
+    INT32 iRet = AGENT_OK;
     string strCfgJsonData;
     stringstream ssCfgFileName;
 
     strCfgJsonData = GetJsonDataFromFile(AGENT_CONFIG_FILE_NAME, AGENT_CONFIG_FILE_PATH);
-    if ("" == strCfgJsonData)
-    {
+    if ("" == strCfgJsonData) {
         return AGENT_E_ERROR;
     }
 
     iRet = ParseLocalAgentConfig(strCfgJsonData.c_str(), pcFlowManager);
-    if (iRet)
-    {
+    if (iRet) {
         INIT_ERROR("ParserLocalCfg failed[%d]", iRet);
         return AGENT_E_ERROR;
     }
@@ -96,13 +87,11 @@ INT32 GetLocalAgentConfig(FlowManager_C * pcFlowManager)
     return AGENT_OK;
 }
 
-UINT32 GetProbePeriod(FlowManager_C * pcFlowManager)
-{
+UINT32 GetProbePeriod(FlowManager_C *pcFlowManager) {
     string strCfgJsonData;
     stringstream ssCfgFileName;
     strCfgJsonData = GetJsonDataFromFile(AGENT_CONFIG_FILE_NAME, AGENT_CONFIG_FILE_PATH);
-    if ("" == strCfgJsonData)
-    {
+    if ("" == strCfgJsonData) {
         return AGENT_E_ERROR;
     }
 

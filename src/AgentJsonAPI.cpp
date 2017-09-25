@@ -40,8 +40,7 @@
 }
 */
 // 解析Agent本地配置文件, 完成初始化配置.
-INT32 ParserLocalCfg(const char * pcJsonData, ServerAntAgentCfg_C * pcCfg)
-{
+INT32 ParserLocalCfg(const char *pcJsonData, ServerAntAgentCfg_C *pcCfg) {
     INT32 iRet = AGENT_OK;
     UINT32 uiIp, uiPort, uiData;
     string strTemp;
@@ -49,8 +48,7 @@ INT32 ParserLocalCfg(const char * pcJsonData, ServerAntAgentCfg_C * pcCfg)
     ptree ptDataRoot, ptDataTmp;
 
     // boost库中出现错误会抛出异常, 未被catch的异常会逐级上报, 最终导致进程abort退出.
-    try
-    {
+    try {
         // pcData字符串转存stringstream格式, 方便后续boost::property_tree处理.
         stringstream ssStringData(pcJsonData);
         read_json(ssStringData, ptDataRoot);
@@ -60,8 +58,7 @@ INT32 ParserLocalCfg(const char * pcJsonData, ServerAntAgentCfg_C * pcCfg)
         ptDataTmp = ptDataRoot.get_child("LogCfg");
         strTemp = ptDataTmp.get<string>("LOG_DIR");
         iRet = SetNewLogDir(strTemp);
-        if (iRet)
-        {
+        if (iRet) {
             JSON_PARSER_ERROR("SetNewLogDir failed[%d]", iRet);
             return iRet;
         }
@@ -106,12 +103,11 @@ INT32 ParserLocalCfg(const char * pcJsonData, ServerAntAgentCfg_C * pcCfg)
         ptDataTmp = ptDataRoot.get_child("ServerAntAgent.ProtocolUDP");
         UINT32 uiSrcPortMin = ptDataTmp.get<UINT32>("SrcPortMin");
         UINT32 uiSrcPortMax = ptDataTmp.get<UINT32>("SrcPortMax");
-        UINT32 uiDestPort   = ptDataTmp.get<UINT32>("DestPort");
+        UINT32 uiDestPort = ptDataTmp.get<UINT32>("DestPort");
         pcCfg->SetProtocolUDP(uiSrcPortMin, uiSrcPortMax, uiDestPort);
 
     }
-    catch (exception const & e)
-    {
+    catch (exception const &e) {
         JSON_PARSER_ERROR("Caught exception [%s] when ParserLocalCfg. LocalCfg:[%s]", e.what(), pcJsonData);
         return AGENT_E_ERROR;
     }
@@ -122,19 +118,16 @@ INT32 ParserLocalCfg(const char * pcJsonData, ServerAntAgentCfg_C * pcCfg)
 #define NormalFlowRequestSignature    "HuaweiDCAnts"
 #define NormalFlowRequestAction       "RequestServerProbeList"
 
-INT32 CreatAgentIPRequestPostData(ServerAntAgentCfg_C * pcCfg, stringstream * pssPostData)
-{
+INT32 CreatAgentIPRequestPostData(ServerAntAgentCfg_C *pcCfg, stringstream *pssPostData) {
     INT32 iRet = AGENT_OK;
 
     stringstream ssJsonData;
     ptree ptDataRoot;
     UINT32 uiIp, uiMgntIp;
     // boost库中出现错误会抛出异常, 未被catch的异常会逐级上报, 最终导致进程abort退出.
-    try
-    {
+    try {
         pcCfg->GetAgentAddress(&uiIp);
-        if (iRet)
-        {
+        if (iRet) {
             JSON_PARSER_ERROR("GetAgentAddress failed[%d]", iRet);
             return iRet;
         }
@@ -146,8 +139,7 @@ INT32 CreatAgentIPRequestPostData(ServerAntAgentCfg_C * pcCfg, stringstream * ps
         write_json(ssJsonData, ptDataRoot);
         (*pssPostData) << ssJsonData.str();
     }
-    catch (exception const & e)
-    {
+    catch (exception const &e) {
         JSON_PARSER_ERROR("Caught exception [%s] when CreatAgentIPRequestPostData.", e.what());
         return AGENT_E_ERROR;
     }
@@ -184,23 +176,21 @@ INT32 CreatAgentIPRequestPostData(ServerAntAgentCfg_C * pcCfg, stringstream * ps
 #define LatencyReportSignature    "HuaweiDC3ServerAntsFull"
 
 // 生成json格式的字符串, 用于向Analyzer上报延时信息.
-INT32 CreateLatencyReportData(AgentFlowTableEntry_S * pstAgentFlowEntry, stringstream * pssReportData, UINT32 maxDelay, UINT32 bigPkgSize)
-{
+INT32 CreateLatencyReportData(AgentFlowTableEntry_S *pstAgentFlowEntry, stringstream *pssReportData, UINT32 maxDelay,
+                              UINT32 bigPkgSize) {
     INT64 max = pstAgentFlowEntry->stFlowDetectResult.lLatencyMax;
-    if (-1 != max && 0 != maxDelay && maxDelay * 1000 > max)
-    {
+    if (-1 != max && 0 != maxDelay && maxDelay * 1000 > max) {
         JSON_PARSER_INFO("Max delay is [%d], less than threshold[%d], does not report.", max, maxDelay * 1000);
         return AGENT_FILTER_DELAY;
     }
 
     ptree ptDataRoot, ptDataFlowArray, ptDataFlowEntry;
     ptree ptDataFlowEntryTemp;
-    char            acCurTime[32]   = {0};                      // 缓存时间戳
+    char acCurTime[32] = {0};                      // 缓存时间戳
 
     stringstream ssJsonData;
     // boost库中出现错误会抛出异常, 未被catch的异常会逐级上报, 最终导致进程abort退出.
-    try
-    {
+    try {
         ptDataRoot.clear();
         ptDataRoot.put("orgnizationSignature", LatencyReportSignature);
 
@@ -230,24 +220,19 @@ INT32 CreateLatencyReportData(AgentFlowTableEntry_S * pstAgentFlowEntry, strings
             ptDataFlowEntryTemp.put("packet-drops", pstAgentFlowEntry->stFlowDetectResult.lPktDropCounter);
             ptDataFlowEntryTemp.put("50percentile", pstAgentFlowEntry->stFlowDetectResult.lLatency50Percentile);
             ptDataFlowEntryTemp.put("99percentile", pstAgentFlowEntry->stFlowDetectResult.lLatency99Percentile);
-            ptDataFlowEntryTemp.put("standard-deviation", pstAgentFlowEntry->stFlowDetectResult.lLatencyStandardDeviation);
+            ptDataFlowEntryTemp.put("standard-deviation",
+                                    pstAgentFlowEntry->stFlowDetectResult.lLatencyStandardDeviation);
             ptDataFlowEntryTemp.put("min", pstAgentFlowEntry->stFlowDetectResult.lLatencyMin);
             ptDataFlowEntryTemp.put("max", max);
             ptDataFlowEntryTemp.put("drop-notices", pstAgentFlowEntry->stFlowDetectResult.lDropNotesCounter);
             ptDataFlowEntry.put_child("statistics", ptDataFlowEntryTemp);
-            if (pstAgentFlowEntry->stFlowKey.uiIsBigPkg)
-            {
-                if (bigPkgSize)
-                {
+            if (pstAgentFlowEntry->stFlowKey.uiIsBigPkg) {
+                if (bigPkgSize) {
                     ptDataFlowEntry.put("package-size", bigPkgSize);
-                }
-                else
-                {
+                } else {
                     ptDataFlowEntry.put("package-size", BIG_PACKAGE_SIZE);
                 }
-            }
-            else
-            {
+            } else {
                 ptDataFlowEntry.put("package-size", NORMAL_PACKAGE_SIZE);
             }
 
@@ -262,8 +247,7 @@ INT32 CreateLatencyReportData(AgentFlowTableEntry_S * pstAgentFlowEntry, strings
         write_json(ssJsonData, ptDataRoot);
         (*pssReportData) << ssJsonData.str();
     }
-    catch (exception const & e)
-    {
+    catch (exception const &e) {
         JSON_PARSER_ERROR("Caught exception [%s] when CreateLatencyReportData.", e.what());
         return AGENT_E_ERROR;
     }
@@ -314,14 +298,12 @@ INT32 CreateLatencyReportData(AgentFlowTableEntry_S * pstAgentFlowEntry, strings
 #define DropReportSignature    "HuaweiDC3ServerAntsDropNotice"
 
 // 生成json格式的字符串, 用于向Analyzer上报丢包信息.
-INT32 CreateDropReportData(AgentFlowTableEntry_S * pstAgentFlowEntry, stringstream * pssReportData, UINT32 bigPkgSize)
-{
+INT32 CreateDropReportData(AgentFlowTableEntry_S *pstAgentFlowEntry, stringstream *pssReportData, UINT32 bigPkgSize) {
     // boost库中出现错误会抛出异常, 未被catch的异常会逐级上报, 最终导致进程abort退出.
-    char            acCurTime[32]   = {0};                      // 缓存时间戳
+    char acCurTime[32] = {0};                      // 缓存时间戳
     ptree ptDataRoot, ptDataFlowArray, ptDataFlowEntry;
     stringstream ssJsonData;
-    try
-    {
+    try {
         ptDataRoot.clear();
         ptDataRoot.put("orgnizationSignature", DropReportSignature);
 
@@ -340,19 +322,13 @@ INT32 CreateDropReportData(AgentFlowTableEntry_S * pstAgentFlowEntry, stringstre
             ptDataFlowEntry.put("packet-sent", pstAgentFlowEntry->stFlowDetectResult.lPktSentCounter);
             ptDataFlowEntry.put("packet-drops", pstAgentFlowEntry->stFlowDetectResult.lPktDropCounter);
 
-            if (pstAgentFlowEntry->stFlowKey.uiIsBigPkg)
-            {
-                if (bigPkgSize)
-                {
+            if (pstAgentFlowEntry->stFlowKey.uiIsBigPkg) {
+                if (bigPkgSize) {
                     ptDataFlowEntry.put("package-size", bigPkgSize);
-                }
-                else
-                {
+                } else {
                     ptDataFlowEntry.put("package-size", BIG_PACKAGE_SIZE);
                 }
-            }
-            else
-            {
+            } else {
                 ptDataFlowEntry.put("package-size", NORMAL_PACKAGE_SIZE);
             }
 
@@ -368,8 +344,7 @@ INT32 CreateDropReportData(AgentFlowTableEntry_S * pstAgentFlowEntry, stringstre
         write_json(ssJsonData, ptDataRoot);
         (*pssReportData) << ssJsonData.str();
     }
-    catch (exception const & e)
-    {
+    catch (exception const &e) {
         JSON_PARSER_ERROR("Caught exception [%s] when CreatDropReportData.", e.what());
         return AGENT_E_ERROR;
     }
@@ -378,39 +353,33 @@ INT32 CreateDropReportData(AgentFlowTableEntry_S * pstAgentFlowEntry, stringstre
 }
 
 // 解析json格式的flow array, 并下发到FlowManager,
-INT32 IssueFlowFromConfigFile(ptree ptFlowArray, FlowManager_C* pcFlowManager)
-{
+INT32 IssueFlowFromConfigFile(ptree ptFlowArray, FlowManager_C *pcFlowManager) {
     INT32 iRet = AGENT_OK;
 
     // boost库中出现错误会抛出异常, 未被catch的异常会逐级上报, 最终导致进程abort退出.
-    try
-    {
+    try {
         ServerFlowKey_S stNewServerFlowKey;
         string dip;
         // 遍历flow flow array, 完成解析和下发
-        for (ptree::iterator itFlow = ptFlowArray.begin(); itFlow != ptFlowArray.end(); itFlow++)
-        {
+        for (ptree::iterator itFlow = ptFlowArray.begin(); itFlow != ptFlowArray.end(); itFlow++) {
             dip = itFlow->second.data(); // first为空, boost格式
             sal_memset(&stNewServerFlowKey, 0, sizeof(stNewServerFlowKey));
 
             iRet = GetFlowInfoFromConfigFile(dip, &stNewServerFlowKey, pcFlowManager->pcAgentCfg);
-            if (iRet)
-            {
+            if (iRet) {
                 JSON_PARSER_ERROR("Get Flow Info From Json failed [%d]", iRet);
                 return iRet;
             }
 
             // 普通流程添加到配置表, 待配置倒换后生效.
             iRet = pcFlowManager->ServerWorkingFlowTableAdd(&stNewServerFlowKey);
-            if (AGENT_OK != iRet)
-            {
+            if (AGENT_OK != iRet) {
                 JSON_PARSER_ERROR("Add New ServerWorkingFlowTable failed [%d]", iRet);
                 return iRet;
             }
         }
     }
-    catch (exception const & e)
-    {
+    catch (exception const &e) {
         JSON_PARSER_ERROR("Caught exception [%s] when IssueFlowFromJsonFlowArray.", e.what());
         return AGENT_E_ERROR;
     }
@@ -419,11 +388,9 @@ INT32 IssueFlowFromConfigFile(ptree ptFlowArray, FlowManager_C* pcFlowManager)
 }
 
 // 解析Server下发的json格式flow数据,转换成ServerFlowKey_S格式
-INT32 GetFlowInfoFromConfigFile(string dip, ServerFlowKey_S * pstNewServerFlowKey, ServerAntAgentCfg_C* pcAgentCfg)
-{
+INT32 GetFlowInfoFromConfigFile(string dip, ServerFlowKey_S *pstNewServerFlowKey, ServerAntAgentCfg_C *pcAgentCfg) {
     // boost库中出现错误会抛出异常, 未被catch的异常会逐级上报, 最终导致进程abort退出.
-    try
-    {
+    try {
         string strTemp;
         UINT32 uiDataTemp = 0;
 
@@ -437,24 +404,24 @@ INT32 GetFlowInfoFromConfigFile(string dip, ServerFlowKey_S * pstNewServerFlowKe
 
         pstNewServerFlowKey->uiDestIP = sal_inet_aton(dip.c_str());
 
-        pstNewServerFlowKey->uiDscp          = pcAgentCfg->getDscp();
-        pstNewServerFlowKey->uiSrcPortMin    = 32769;
-        pstNewServerFlowKey->uiSrcPortMax    = 32868;
-        pstNewServerFlowKey->uiSrcPortRange  = 5;
+        pstNewServerFlowKey->uiDscp = pcAgentCfg->getDscp();
+        pstNewServerFlowKey->uiSrcPortMin = 32769;
+        pstNewServerFlowKey->uiSrcPortMax = 32868;
+        pstNewServerFlowKey->uiSrcPortRange = 5;
 
-        pstNewServerFlowKey->stServerTopo.uiSvid   = 0;
-        pstNewServerFlowKey->stServerTopo.uiDvid   = 0;
-        pstNewServerFlowKey->stServerTopo.uiLevel  = 1;
+        pstNewServerFlowKey->stServerTopo.uiSvid = 0;
+        pstNewServerFlowKey->stServerTopo.uiDvid = 0;
+        pstNewServerFlowKey->stServerTopo.uiLevel = 1;
     }
-    catch (exception const & e)
-    {
+    catch (exception const &e) {
         JSON_PARSER_ERROR("Caught exception [%s] when GetFlowInfoFromConfigFile.", e.what());
         return AGENT_E_ERROR;
     }
 
     JSON_PARSER_INFO("Get Flow From Server: sip[%s], sport[%u]-[%u], range[%u], dscp[%d], Urgent[%d], Protocol[%d]",
-                     sal_inet_ntoa(pstNewServerFlowKey->uiSrcIP), pstNewServerFlowKey->uiSrcPortMin, pstNewServerFlowKey->uiSrcPortMax, pstNewServerFlowKey->uiSrcPortRange,
-                     pstNewServerFlowKey->uiDscp, pstNewServerFlowKey->uiUrgentFlow,  pstNewServerFlowKey->eProtocol);
+                     sal_inet_ntoa(pstNewServerFlowKey->uiSrcIP), pstNewServerFlowKey->uiSrcPortMin,
+                     pstNewServerFlowKey->uiSrcPortMax, pstNewServerFlowKey->uiSrcPortRange,
+                     pstNewServerFlowKey->uiDscp, pstNewServerFlowKey->uiUrgentFlow, pstNewServerFlowKey->eProtocol);
 
     JSON_PARSER_INFO("                      dip[%s], topy: Level[%u], Source id[%8u], Dest id[%8u]",
                      sal_inet_ntoa(pstNewServerFlowKey->uiDestIP), pstNewServerFlowKey->stServerTopo.uiLevel,
@@ -463,8 +430,7 @@ INT32 GetFlowInfoFromConfigFile(string dip, ServerFlowKey_S * pstNewServerFlowKe
     return AGENT_OK;
 }
 
-INT32 ParseLocalAgentConfig(const char * pcJsonData, FlowManager_C * pcFlowManager)
-{
+INT32 ParseLocalAgentConfig(const char *pcJsonData, FlowManager_C *pcFlowManager) {
     INT32 iRet = AGENT_OK;
     string strTemp;
     UINT32 data;
@@ -472,8 +438,7 @@ INT32 ParseLocalAgentConfig(const char * pcJsonData, FlowManager_C * pcFlowManag
     ptree ptDataRoot, ptDataTmp;
 
     // boost库中出现错误会抛出异常, 未被catch的异常会逐级上报, 最终导致进程abort退出.
-    try
-    {
+    try {
         // pcData字符串转存stringstream格式, 方便后续boost::property_tree处理.
         stringstream ssStringData(pcJsonData);
         read_json(ssStringData, ptDataRoot);
@@ -510,20 +475,17 @@ INT32 ParseLocalAgentConfig(const char * pcJsonData, FlowManager_C * pcFlowManag
         JSON_PARSER_INFO("Current lossPkg_timeout is [%u].", pcFlowManager->pcAgentCfg->GetDetectTimeout());
 
 
-
         strTemp = ptDataRoot.get<string>("kafka_ip");
         pcFlowManager->pcAgentCfg->SetKafkaIp(strTemp);
         JSON_PARSER_INFO("Current kafka_ip is [%s].", pcFlowManager->pcAgentCfg->GetKafkaIp().c_str());
 
 
-
-
         strTemp = ptDataRoot.get<string>("basicToken");
-        std::cout<<"######################################## basicToken" << strTemp<<std::endl;
+        std::cout << "######################################## basicToken" << strTemp << std::endl;
 
 
         pcFlowManager->pcAgentCfg->SetKafkaBasicToken(strTemp);
-        std::cout<<"######################################## basicToken" << strTemp<<std::endl;
+        std::cout << "######################################## basicToken" << strTemp << std::endl;
         JSON_PARSER_INFO("Current kafkaBasicToken is [%u].", pcFlowManager->pcAgentCfg->GetKafkaBasicToken().c_str());
 
 
@@ -532,8 +494,7 @@ INT32 ParseLocalAgentConfig(const char * pcJsonData, FlowManager_C * pcFlowManag
         JSON_PARSER_INFO("Current topic is [%s].", pcFlowManager->pcAgentCfg->GetTopic().c_str());
 
         data = ptDataRoot.get<UINT32>("vbondIp_flag");
-        if (data)
-        {
+        if (data) {
             JSON_PARSER_INFO("Set vbondIp_flag to [%u], will report agent ip in next interval.", data);
             SHOULD_REPORT_IP = 1;
         }
@@ -546,46 +507,39 @@ INT32 ParseLocalAgentConfig(const char * pcJsonData, FlowManager_C * pcFlowManag
         ptDataTmp.clear();
         ptDataTmp = ptDataRoot.get_child("pingList");
         bool flag = false;
-        for (ptree::iterator itFlow = ptDataTmp.begin(); itFlow != ptDataTmp.end(); itFlow++)
-        {
+        for (ptree::iterator itFlow = ptDataTmp.begin(); itFlow != ptDataTmp.end(); itFlow++) {
             strTemp = itFlow->first.data(); // first为空, boost格式
-            if (0 == sal_strcmp(strTemp.c_str(), sal_inet_ntoa(pcFlowManager->pcAgentCfg->GetAgentIP())))
-            {
-                ptDataTmp =  itFlow->second;
+            if (0 == sal_strcmp(strTemp.c_str(), sal_inet_ntoa(pcFlowManager->pcAgentCfg->GetAgentIP()))) {
+                ptDataTmp = itFlow->second;
                 flag = true;
                 break;
-            }
-            else
-            {
+            } else {
                 continue;
             }
 
         }
 
-        if (!flag)
-        {
-            JSON_PARSER_ERROR("Can not find agent pingList config by ip [%s]. Maybe first start.", sal_inet_ntoa(pcFlowManager->pcAgentCfg->GetAgentIP()));
+        if (!flag) {
+            JSON_PARSER_ERROR("Can not find agent pingList config by ip [%s]. Maybe first start.",
+                              sal_inet_ntoa(pcFlowManager->pcAgentCfg->GetAgentIP()));
             return AGENT_OK;
         }
         pcFlowManager->ServerClearFlowTable();
         iRet = IssueFlowFromConfigFile(ptDataTmp, pcFlowManager);
-        if (iRet)
-        {
+        if (iRet) {
             JSON_PARSER_ERROR("Issue Flow From Json Flow Array failed [%d]. Flow info[%s]", iRet, pcJsonData);
             return iRet;
         }
         pcFlowManager->RefreshAgentTable();
     }
-    catch (exception const & e)
-    {
+    catch (exception const &e) {
         JSON_PARSER_ERROR("Caught exception [%s] when ParseLocalAgentConfig. LocalConfig:[%s]", e.what(), pcJsonData);
         return AGENT_E_ERROR;
     }
     return iRet;
 }
 
-UINT32 ParseProbePeriodConfig(const char * pcJsonData, FlowManager_C * pcFlowManager)
-{
+UINT32 ParseProbePeriodConfig(const char *pcJsonData, FlowManager_C *pcFlowManager) {
     UINT32 iRet = 9999;
     string strTemp;
     UINT32 data;
@@ -593,16 +547,14 @@ UINT32 ParseProbePeriodConfig(const char * pcJsonData, FlowManager_C * pcFlowMan
     ptree ptDataRoot;
 
     // boost库中出现错误会抛出异常, 未被catch的异常会逐级上报, 最终导致进程abort退出.
-    try
-    {
+    try {
         // pcData字符串转存stringstream格式, 方便后续boost::property_tree处理.
         stringstream ssStringData(pcJsonData);
         read_json(ssStringData, ptDataRoot);
         data = ptDataRoot.get<UINT32>("probe_period");
         return data;
     }
-    catch (exception const & e)
-    {
+    catch (exception const &e) {
         JSON_PARSER_ERROR("Caught exception [%s] when ParseLocalAgentConfig. LocalConfig:[%s]", e.what(), pcJsonData);
         return iRet;
     }

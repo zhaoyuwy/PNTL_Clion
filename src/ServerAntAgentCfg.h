@@ -6,15 +6,13 @@
 #define PNTL_AGENT_SERVERANTAGENTCFG_H
 
 
-
 #include <string>
 #include "AgentCommon.h"
 
 /*
 UDP 协议需要源端口范围用于申请探测socket, 目的端口用于响应探测报文及填充探测
 */
-typedef struct tagServerAntAgentProtocolUDP
-{
+typedef struct tagServerAntAgentProtocolUDP {
     UINT32 uiDestPort;               // 探测报文的目的端口, 服务端监听端口, 用于监听探测报文并进行应答.
     UINT32 uiSrcPortMin;             // 客户端探测报文源端口范围Min, 用于发送探测报文并监听应答.
     UINT32 uiSrcPortMax;             // 客户端探测报文源端口范围Max, 用于发送探测报文并监听应答.
@@ -22,8 +20,7 @@ typedef struct tagServerAntAgentProtocolUDP
 
 
 // ServerAntAgent全局配置信息
-class ServerAntAgentCfg_C
-{
+class ServerAntAgentCfg_C {
 private:
     /* ServerAnt地址信息,管理通道 */
     UINT32 uiServerIP;                //  ServerAntServer的IP地址, Agent向Server发起查询会话时使用.
@@ -60,15 +57,16 @@ public:
     ServerAntAgentCfg_C();                  // 类构造函数, 填充默认值.
     ~ServerAntAgentCfg_C();                 // 类析构函数, 释放必要资源.
 
-    void GetServerAddress(UINT32 * puiServerIP,
-                          UINT32 * puiServerDestPort);        // 查询ServerAntServer地址信息.
+    void GetServerAddress(UINT32 *puiServerIP,
+                          UINT32 *puiServerDestPort);        // 查询ServerAntServer地址信息.
     void SetServerAddress(UINT32 uiNewServerIP,
                           UINT32 uiNewServerDestPort);         // 设置ServerAntServer地址信息, 非0有效.
 
-    void GetAgentAddress(UINT32 * puiAgentIP);         // 查询ServerAntAgent地址信息.
+    void GetAgentAddress(UINT32 *puiAgentIP);         // 查询ServerAntAgent地址信息.
     void SetAgentAddress(UINT32 uiNewAgentIP);          // 设置ServerAntAgent地址信息, 非0有效.
 
-    void GetMgntIP(UINT32* puiMgntIP);
+    void GetMgntIP(UINT32 *puiMgntIP);
+
     void SetMgntIP(UINT32 uiNewMgntIP);         // 设定管理口ip
 
     UINT32 GetPollingTimerPeriod();   // 查询Polling周期
@@ -91,32 +89,39 @@ public:
     UINT32 GetDetectDropThresh();                         // 查询Detect报文丢包门限
     void SetDetectDropThresh(UINT32 uiNewThresh);         // 设定Detect报文丢包门限
 
-    void GetProtocolUDP(UINT32 * puiSrcPortMin,
-                        UINT32 * puiSrcPortMax,
-                        UINT32 * puiDestPort);           // 查询UDP探测报文端口范围.
+    void GetProtocolUDP(UINT32 *puiSrcPortMin,
+                        UINT32 *puiSrcPortMax,
+                        UINT32 *puiDestPort);           // 查询UDP探测报文端口范围.
     void SetProtocolUDP(UINT32 uiSrcPortMin,
                         UINT32 uiSrcPortMax,
                         UINT32 uiDestPort);             // 设定UDP探测报文端口范围, 只刷新非0端口
 
     UINT32 GetPortCount();
+
     void SetPortCount(UINT32 newPortCount);
 
     UINT32 getDscp();
+
     void SetDscp(UINT32 newDscp);
 
     UINT32 GetBigPkgRate();
+
     void SetBigPkgRate(UINT32 newRate);
 
     UINT32 GetMaxDelay();
+
     void SetMaxDelay(UINT32 newMaxDelay);
 
     UINT32 GetBigPkgSize();
+
     void SetBigPkgSize(UINT32 newSize);
 
     string GetKafkaIp();
+
     void SetKafkaIp(string newIp);
 
     string GetKafkaBasicToken();
+
     void SetKafkaBasicToken(string newIp);
 
     string GetTopic();

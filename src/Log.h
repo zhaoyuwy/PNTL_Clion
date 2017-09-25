@@ -6,13 +6,11 @@
 #define PNTL_AGENT_LOG_H
 
 
-
 #include "Sal.h"
 #include "AgentCommon.h"
 
-typedef enum tagAgentModule
-{
-    AGENT_MODULE_SAL  = 1,          // 系统适配功能日志
+typedef enum tagAgentModule {
+    AGENT_MODULE_SAL = 1,          // 系统适配功能日志
     AGENT_MODULE_TIMER,             // TIMER 适配模块
     AGENT_MODULE_INIT,              // 初始化功能,main函数等
     AGENT_MODULE_COMMON,            // 公共模块
@@ -31,9 +29,8 @@ typedef enum tagAgentModule
 
 } AgentModule_E;
 
-typedef enum tagAgentLogType
-{
-    AGENT_LOG_TYPE_INFO  = 1,   // 提示
+typedef enum tagAgentLogType {
+    AGENT_LOG_TYPE_INFO = 1,   // 提示
     AGENT_LOG_TYPE_WARNING,     // 告警
     AGENT_LOG_TYPE_ERROR,       // 错误
     AGENT_LOG_TYPE_LOSS_PACKET,       // 丢包
@@ -41,18 +38,22 @@ typedef enum tagAgentLogType
     AGENT_LOG_TYPE_MAX
 } AgentLogType_E;
 
-typedef enum  tagAgentLogMode
-{
+typedef enum tagAgentLogMode {
     AGENT_LOG_MODE_NORMAL = 0,   // 日志直接打印到终端,且在调用程序的当前目录创建日志文件.
     AGENT_LOG_MODE_DAEMON,       // 日志不打印到终端,直接记录到syslog.
     AGENT_LOG_MODE_MAX
 } AgentLogMode_E;
 
 extern INT32 SetNewLogMode(AgentLogMode_E eNewLogMode);
+
 extern INT32 SetNewLogDir(string strNewDirPath);
+
 extern void GetPrintTime(char *timestr);
+
 extern INT32 AgentLogPrintf(AgentModule_E eModule, AgentLogType_E eLogType, const CHAR *szFormat, ...);
+
 extern string GetLossLogFilePath();
+
 extern string GetLatencyLogFilePath();
 
 //__PRETTY_FUNCTION__
@@ -157,7 +158,6 @@ do                                                                              
 #define MSG_CLIENT_ERROR(...)        MODULE_ERROR(MSG_CLIENT,   __VA_ARGS__)
 #define JSON_PARSER_ERROR(...)       MODULE_ERROR(JSON_PARSER,   __VA_ARGS__)
 #define FILE_NOTIFIER_ERROR(...)     MODULE_ERROR(FILE_NOTIFIER, __VA_ARGS__)
-
 
 
 #endif //PNTL_AGENT_LOG_H
