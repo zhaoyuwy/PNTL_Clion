@@ -156,7 +156,22 @@ typedef struct tagWorkerCfg
     UINT32   uiSrcPort;              // 探测源端口号. 创建socket时使用
     UINT32   uiDestPort;             // 探测目的端口号. 预留TCP扩展.
 } WorkerCfg_S;
-
+struct IcmpEchoReply {
+    int icmpSeq;
+    int icmpLen;
+    int ipTtl;
+    double rtt;
+    std::string fromAddr;
+    bool isReply;
+};
+struct PingResult {
+    int dataLen;
+    int nsend;
+    int nreceived;
+    std::string ip;
+    std::string error;
+    std::vector<IcmpEchoReply> icmpEchoReplys;
+};
 // DetectWorker 会话信息
 typedef struct tagDetectWorkerSession
 {
@@ -205,7 +220,7 @@ private:
     UINT32 uiHandlerDefaultInterval;          // Handler状态刷新默认周期, 单位为us
     INT32 RxUpdateSession
             (PacketInfo_S * pstPakcet);                 // Rx任务收到应答报文后, 通知worker刷新会话列表, Rx任务使用
-
+    struct timeval tvSub(struct timeval timeval1,struct timeval timeval2);
 public:
     DetectWorker_C();                               // 构造函数, 填充默认值.
     ~DetectWorker_C();                              // 析构函数, 释放必要资源.
@@ -217,7 +232,7 @@ public:
 
     int packIcmp(int pack_no, struct icmp* icmp);
     unsigned short getChksum(unsigned short *addr,int len);
-    bool sendPacket();
+    bool unpackIcmp(char *buf,int len, struct IcmpEchoReply *icmpEchoReply);
     INT32 m_nsend;
     INT32 m_icmp_seq ;
 

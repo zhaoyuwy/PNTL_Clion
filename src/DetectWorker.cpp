@@ -200,7 +200,9 @@ INT32 DetectWorker_C::ThreadHandler()
 
         DETECT_WORKER_INFO("RX: Start Working, Using socket[%u], Protocol[%u], Port[%u], Interval[%dus], Role[%d]",
                            iSockFd, stCfg.eProtocol,stCfg.uiSrcPort, GetCurrentInterval(), stCfg.uiRole);
+        struct IcmpEchoReply icmpEchoReply;
 
+        int len;
         while (GetCurrentInterval())
         {
             switch (stCfg.eProtocol)
@@ -293,7 +295,7 @@ INT32 DetectWorker_C::ThreadHandler()
                         }
                     }
                     break;
-//                    add ICMP
+//                    add ICMP recv
                 case AGENT_DETECT_PROTOCOL_ICMP:
                     // 清空对端地址, payload buffer.
                     sal_memset(&stPrtnerAddr, 0, sizeof(stPrtnerAddr));
@@ -314,12 +316,24 @@ INT32 DetectWorker_C::ThreadHandler()
 
 //                    struct sockaddr_in m_from_addr;
 //                    socklen_t fromlen = sizeof(m_from_addr);
-                    iRet = recvfrom(iSockFd, &acCmsgBuf,sizeof(acCmsgBuf),0, (struct sockaddr *)&m_from_addr,&fromlen);
+
+                    iRet = recvfrom(iSockFd, &m_recvpacket,sizeof(m_recvpacket),0, (struct sockaddr *)&m_from_addr,&fromlen);
                     DETECT_WORKER_INFO("$$$$$$$$$$$$$$$$ Recived uiIsBigPkg Msg size [%d]", iRet);
-                    if (iRet == sizeof(PacketInfo_S) || iRet == sizeof(aucBuffer))
+                    if (iRet == sizeof(PacketInfo_S) || iRet == sizeof(aucBuffer)||iRet==sizeof(m_recvpacket))
+//                    if (iRet>-1)
                     {
                         sal_memset(&tm, 0, sizeof(tm));
                         gettimeofday(&tm,NULL); //获取当前时间
+
+
+                        icmpEchoReply.fromAddr = inet_ntoa(m_from_addr.sin_addr) ;
+
+                        if(unpackIcmp(m_recvpacket, len, &icmpEchoReply)==-1) {
+                            //retry again
+
+                            continue;
+                        }
+
 
                         // 获取报文中附带的tos信息.
                         cmsg = CMSG_FIRSTHDR(&msg);
@@ -754,7 +768,7 @@ INT32 DetectWorker_C::TxPacket(DetectWorkerSession_S*
             }
             break;
 
-//          add ICMP pro
+//          add ICMP pro  send
         case AGENT_DETECT_PROTOCOL_ICMP:
             servaddr.sin_family = AF_INET;
             servaddr.sin_addr.s_addr = htonl(pNewSession->stFlowKey.uiDestIP);
@@ -771,21 +785,26 @@ INT32 DetectWorker_C::TxPacket(DetectWorkerSession_S*
                 break;
             }
 
+            size_t packetsize;
+            m_icmp_seq++;
+            packetsize = packIcmp(m_icmp_seq,(struct icmp*)m_sendpacket);
+
             if (pNewSession->stFlowKey.uiIsBigPkg)
             {
                 PacketHtoN(pstSendMsg);// 主机序转网络序
                 iRet = sendto(GetSocket(), aucBuff, sizeof(aucBuff), 0, (sockaddr *)&servaddr, sizeof(servaddr));
-                DETECT_WORKER_INFO("$$$$$$$$$$$$$$$$Send uiIsBigPkg Msg size [%d]", iRet);
+                DETECT_WORKER_INFO("$$$$$$$$$$$$$$$$Send uiIsBigPkg true Msg size [%d]", iRet);
             }
             else
             {
+
                 PacketHtoN(&stSendMsg);// 主机序转网络序
-                iRet = sendto(GetSocket(), &stSendMsg, sizeof(PacketInfo_S), 0, (sockaddr *)&servaddr, sizeof(servaddr));
-                DETECT_WORKER_INFO("$$$$$$$$$$$$$$$$Send buff Msg size [%d]", iRet);
+                iRet = sendto(GetSocket(), &m_sendpacket, packetsize, 0, (sockaddr *)&servaddr, sizeof(servaddr));
+                DETECT_WORKER_INFO("$$$$$$$$$$$$$$$$Send ICMP Msg size [%d]", iRet);
             }
 
 
-            if (sizeof(PacketInfo_S) == iRet || iRet == sizeof(aucBuff)) //发送成功.
+            if (sizeof(PacketInfo_S) == iRet || iRet == sizeof(aucBuff)||packetsize == iRet) //发送成功.
             {
                 pNewSession->uiSessionState = SESSION_STATE_WAITING_REPLY;
                 iRet = TxUpdateSession(pNewSession);
@@ -809,22 +828,53 @@ INT32 DetectWorker_C::TxPacket(DetectWorkerSession_S*
     return iRet;
 }
 /*发送三个ICMP报文*/
-bool DetectWorker_C::sendPacket()
+bool DetectWorker_C::unpackIcmp(char *buf,int len, struct IcmpEchoReply *icmpEchoReply)
 {
-    size_t packetsize;
-    while( m_nsend < 10)
-    {
-        m_nsend++;
-        m_icmp_seq++;
-        packetsize = packIcmp(m_icmp_seq, (struct icmp*)m_sendpacket); /*设置ICMP报头*/
+    int i,iphdrlen;
+    struct ip *ip;
+    struct icmp *icmp;
+    struct timeval *tvsend, tvrecv, tvresult;
+    double rtt;
 
-        if(sendto(m_sockfd,m_sendpacket, packetsize, 0, (struct sockaddr *) &m_dest_addr, sizeof(m_dest_addr)) < 0  )
-        {
-            perror("sendto error");
-            continue;
-        }
+    ip = (struct ip *)buf;
+    iphdrlen = ip->ip_hl << 2;    /*求ip报头长度,即ip报头的长度标志乘4*/
+    icmp = (struct icmp *)(buf + iphdrlen);  /*越过ip报头,指向ICMP报头*/
+    len -= iphdrlen;            /*ICMP报头及ICMP数据报的总长度*/
+    if(len < 8)                /*小于ICMP报头长度则不合理*/
+    {
+        printf("ICMP packets\'s length is less than 8\n");
+        return false;
     }
-    return true;
+    /*确保所接收的是我所发的的ICMP的回应*/
+    if( (icmp->icmp_type==ICMP_ECHOREPLY) && (icmp->icmp_id == m_pid) )
+    {
+
+        tvsend=(struct timeval *)icmp->icmp_data;
+        gettimeofday(&tvrecv,NULL);  /*记录接收时间*/
+        tvresult = tvSub(tvrecv, *tvsend);  /*接收和发送的时间差*/
+        rtt=tvresult.tv_sec*1000 + tvresult.tv_usec/1000;  /*以毫秒为单位计算rtt*/
+        icmpEchoReply->rtt = rtt;
+        icmpEchoReply->icmpSeq = icmp->icmp_seq;
+        icmpEchoReply->ipTtl = ip->ip_ttl;
+        icmpEchoReply->icmpLen = len;
+        return true;
+    }
+    else {
+        return false;
+    }
+}
+/*两个timeval结构相减*/
+struct timeval DetectWorker_C::tvSub(struct timeval timeval1,struct timeval timeval2)
+{
+    struct timeval result;
+    result = timeval1;
+    if (result.tv_usec < timeval2.tv_usec < 0)
+    {
+        --result.tv_sec;
+        result.tv_usec += 1000000;
+    }
+    result.tv_sec -= timeval2.tv_sec;
+    return result;
 }
 
 /*校验和算法*/
