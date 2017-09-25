@@ -17,6 +17,8 @@
 #include <string.h>
 #include <stdio.h>
 
+#include <netinet/ip_icmp.h>
+
 #include "AgentCommon.h"
 
 #define UDP_TEST_PORT       6000
@@ -293,16 +295,13 @@ INT32 DetectWorker_C::ThreadHandler()
                     sal_memset(acCmsgBuf, 0, sizeof(acCmsgBuf));
                     iTos = 0;
 
-                    /*
-                       老版本的Linux kernel, sendmsg时不支持设定tos, recvmsg支持获取tos.
-                       为了兼容老版本, sendmsg时去除msg_control信息, recvmsg时添加msg_control信息.
-                    */
                     // 报文附加信息buffer
                     msg.msg_control = acCmsgBuf;
                     msg.msg_controllen = sizeof(acCmsgBuf);
 
                     // 接收报文
                     iRet = recvmsg(iSockFd, &msg, 0);
+                    DETECT_WORKER_INFO("$$$$$$$$$$$$$$$$$$$$$$  Receive size [%d]",iRet);
                     if (iRet == sizeof(PacketInfo_S) || iRet == sizeof(aucBuffer))
                     {
                         sal_memset(&tm, 0, sizeof(tm));
@@ -339,10 +338,6 @@ INT32 DetectWorker_C::ThreadHandler()
                         }
                         else if(WORKER_ROLE_CLIENT == pstSendMsg->uiRole)
                         {
-                            /*
-                               老版本的Linux kernel, sendmsg时不支持设定tos, recvmsg支持获取tos.
-                               为了兼容老版本, sendmsg时去除msg_control信息, recvmsg时添加msg_control信息.
-                            */
                             msg.msg_control = NULL;
                             msg.msg_controllen = 0;
 
@@ -678,8 +673,23 @@ INT32 DetectWorker_C::TxPacket(DetectWorkerSession_S*
         stSendMsg.stT1.uiUsec = tm.tv_usec;
         stSendMsg.uiRole = WORKER_ROLE_CLIENT;
         pNewSession->stT1 = stSendMsg.stT1; //保存T1时间
-    }
 
+//        struct icmphdr stIcmpHdr;
+//        struct timeval stTimeVal;
+//        memset(&stIcmpHdr,0,sizeof(servaddr));
+//        struct sockaddr_in stDestAddr;
+
+
+
+
+    }
+    //        icmp she zhi shuju bao
+    INT32 i,packsize;
+    struct icmp *picmp;
+    struct timeval *tval;
+    char sendIcmpBuff[4096];
+    static INT32  index = 0;
+    INT32             iSockFd = GetSocket();    // 本任务使用的socket描述符
     // 检查socket是否已经ready
     if( 0 == GetSocket())
     {
@@ -743,6 +753,10 @@ INT32 DetectWorker_C::TxPacket(DetectWorkerSession_S*
 //            servaddr.sin_port = htons(pNewSession->stFlowKey.uiDestPort);
             servaddr.sin_port = 0;
 
+
+
+
+
             tos = (pNewSession->stFlowKey.uiDscp)<<2; //dscp左移2位, 变成tos
             // IP_TOS对于stream(TCP)socket不会修改ECN bit, 其他情况下会覆盖ip头中整个tos字段
             iRet = setsockopt(GetSocket(), SOL_IP, IP_TOS, &tos, sizeof(tos));
@@ -761,7 +775,16 @@ INT32 DetectWorker_C::TxPacket(DetectWorkerSession_S*
             else
             {
                 PacketHtoN(&stSendMsg);// 主机序转网络序
+
+                picmp = (struct icmp*)sendIcmpBuff;
+                picmp->icmp_type=ICMP_ECHO;
+                picmp->icmp_code =0 ;
+                picmp->icmp_cksum=0;
+                picmp->icmp_seq = index++;
+                picmp->icmp_id =
                 iRet = sendto(GetSocket(), &stSendMsg, sizeof(PacketInfo_S), 0, (sockaddr *)&servaddr, sizeof(servaddr));
+                DETECT_WORKER_INFO("send mesg stSendMsg   send sizeof(PacketInfo_S)  [%d]", sizeof(PacketInfo_S));
+                DETECT_WORKER_INFO("send mesg stSendMsg   send iRet   [%d]", iRet);
             }
 
 
