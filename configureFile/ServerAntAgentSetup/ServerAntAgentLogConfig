@@ -1,0 +1,29 @@
+/opt/huawei/logs/ServerAntAgent/*.log /opt/huawei/ServerAntAgent/logs/*.log {
+    # Old versions of log files are compressed with gzip by default.
+    compress
+
+    # Archive old versions of log files adding a daily extension like YYYYMMDD instead of simply adding a number.
+    dateext
+
+    # Remove rotated logs older than <count> days.
+    maxage 365
+
+    # Log files are rotated <count> times before being removed or mailed to the address specified in a mail directive.
+    rotate 30
+
+    # Log files are rotated when they grow bigger than size bytes.
+    size=+4096k
+
+    # Do not rotate the log if it is empty (this overrides the ifempty option)
+    notifempty
+
+    # If the log file is missing, go on to the next one without issuing an error message.
+    missingok
+
+    # copy then truncate, app do not need to reopen the log file
+    copytruncate
+
+    # Rotate log files with the specified user and group instead of using the default (usually root).
+    su root root
+}
+
