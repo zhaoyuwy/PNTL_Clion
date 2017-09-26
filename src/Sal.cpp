@@ -24,8 +24,7 @@ using namespace std;
 // Common
 
 
-void sal_usleep(UINT32 usec)
-{
+void sal_usleep(UINT32 usec) {
     INT32 iRet = 0;
     // usleep()可能会因为进程收到信号(比如alarm)而提前返回EINTR, 后续优化
     iRet = usleep(usec);
@@ -33,8 +32,7 @@ void sal_usleep(UINT32 usec)
         SAL_WARNING("Sleep: usleep failed[%d]: %s [%d]", iRet, strerror(errno), errno);
 }
 
-void sal_sleep(UINT32 sec)
-{
+void sal_sleep(UINT32 sec) {
     INT32 iRet = 0;
     // sleep()可能会因为进程收到信号(比如alarm)而提前返回EINTR, 后续优化
     iRet = sleep(sec);
@@ -44,16 +42,14 @@ void sal_sleep(UINT32 sec)
 
 
 // 输入主机序ip二进制地址, 输出ip地址字符串, 字符串保存在每thread一份的静态内存中, 无需释放.
-char *sal_inet_ntoa(UINT32 ip)
-{
+char *sal_inet_ntoa(UINT32 ip) {
     struct in_addr in;
     in.s_addr = htonl(ip);
     return inet_ntoa(in);
 }
 
 // 输入ip地址字符串, 输出主机序ip二进制地址
-UINT32 sal_inet_aton(const char * cp)
-{
+UINT32 sal_inet_aton(const char *cp) {
     struct in_addr in;
     inet_aton(cp, &in);
 
@@ -61,12 +57,10 @@ UINT32 sal_inet_aton(const char * cp)
 }
 
 void *
-sal_memset(void *dst_void, INT32 val, size_t len)
-{
-    unsigned char *dst = (unsigned char *)dst_void;
+sal_memset(void *dst_void, INT32 val, size_t len) {
+    unsigned char *dst = (unsigned char *) dst_void;
 
-    while (len--)
-    {
+    while (len--) {
         *dst++ = (unsigned char) val;
     }
 
@@ -74,12 +68,10 @@ sal_memset(void *dst_void, INT32 val, size_t len)
 }
 
 INT32
-sal_strlen(const char *s)
-{
+sal_strlen(const char *s) {
     const char *s_orig = s;
 
-    while (*s != 0)
-    {
+    while (*s != 0) {
         s++;
     }
 
@@ -87,13 +79,11 @@ sal_strlen(const char *s)
 }
 
 char *
-sal_strncpy(char *dst, const char *src, size_t length)
-{
+sal_strncpy(char *dst, const char *src, size_t length) {
     INT32 i = 0;
     char *dst_orig = dst;
 
-    while ((*dst++ = *src++) != 0 && (i <= length))
-    {
+    while ((*dst++ = *src++) != 0 && (i <= length)) {
         ++i;
     }
 
@@ -101,21 +91,15 @@ sal_strncpy(char *dst, const char *src, size_t length)
 }
 
 INT32
-sal_strcmp(const char *s1, const char *s2)
-{
-    do
-    {
-        if (*s1 < *s2)
-        {
+sal_strcmp(const char *s1, const char *s2) {
+    do {
+        if (*s1 < *s2) {
             return -1;
-        }
-        else if (*s1 > *s2)
-        {
+        } else if (*s1 > *s2) {
             return 1;
         }
         s1++;
-    }
-    while (*s2++);
+    } while (*s2++);
 
     return 0;
 }
@@ -123,8 +107,7 @@ sal_strcmp(const char *s1, const char *s2)
 // mutex, semaphore
 static
 INT32
-_sal_compute_timeout(struct timespec *ts, INT32 usec)
-{
+_sal_compute_timeout(struct timespec *ts, INT32 usec) {
     INT32 sec;
     UINT32 nsecs;
 
@@ -139,8 +122,7 @@ _sal_compute_timeout(struct timespec *ts, INT32 usec)
     nsecs = ts->tv_nsec + (usec % SECOND_USEC) * 1000;
 
     /* detect and handle rollover */
-    if (nsecs < ts->tv_nsec)
-    {
+    if (nsecs < ts->tv_nsec) {
         ts->tv_sec += 1;
         nsecs -= SECOND_NSEC;
     }
@@ -148,8 +130,7 @@ _sal_compute_timeout(struct timespec *ts, INT32 usec)
 
     /* Normalize if needed */
     sec = ts->tv_nsec / SECOND_NSEC;
-    if (sec)
-    {
+    if (sec) {
         ts->tv_sec += sec;
         ts->tv_nsec = ts->tv_nsec % SECOND_NSEC;
     }
@@ -170,24 +151,21 @@ _sal_compute_timeout(struct timespec *ts, INT32 usec)
  *   use the Linux support instead of our own.
  */
 
-typedef struct recursive_mutex_s
-{
+typedef struct recursive_mutex_s {
     pthread_mutex_t mutex;
-    const char      *desc;
+    const char *desc;
 } recursive_mutex_t;
 
 sal_mutex_t
-sal_mutex_create(const char *desc)
-{
-    recursive_mutex_t   *rm;
+sal_mutex_create(const char *desc) {
+    recursive_mutex_t *rm;
     pthread_mutexattr_t attr;
 
-    if ((rm = (recursive_mutex_t *)malloc(sizeof (recursive_mutex_t))) == NULL)
-    {
+    if ((rm = (recursive_mutex_t *) malloc(sizeof(recursive_mutex_t))) == NULL) {
         return NULL;
     }
 
-    sal_memset(rm,0,sizeof(recursive_mutex_t));
+    sal_memset(rm, 0, sizeof(recursive_mutex_t));
 
     rm->desc = desc;
     pthread_mutexattr_init(&attr);
@@ -200,9 +178,8 @@ sal_mutex_create(const char *desc)
 }
 
 void
-sal_mutex_destroy(sal_mutex_t m)
-{
-    recursive_mutex_t   *rm = (recursive_mutex_t *) m;
+sal_mutex_destroy(sal_mutex_t m) {
+    recursive_mutex_t *rm = (recursive_mutex_t *) m;
 
     assert(rm);
     pthread_mutex_destroy(&rm->mutex);
@@ -211,9 +188,8 @@ sal_mutex_destroy(sal_mutex_t m)
 }
 
 INT32
-sal_mutex_take(sal_mutex_t m, INT32 usec)
-{
-    recursive_mutex_t   *rm = (recursive_mutex_t *) m;
+sal_mutex_take(sal_mutex_t m, INT32 usec) {
+    recursive_mutex_t *rm = (recursive_mutex_t *) m;
     INT32 err = 0;
 
     struct timespec ts;
@@ -222,22 +198,16 @@ sal_mutex_take(sal_mutex_t m, INT32 usec)
 
     errno = 0;
 
-    if (usec == sal_mutex_FOREVER)
-    {
-        do
-        {
+    if (usec == sal_mutex_FOREVER) {
+        do {
             err = pthread_mutex_lock(&rm->mutex);
-        }
-        while (err != 0 && errno == EINTR);
-    }
-    else if (_sal_compute_timeout(&ts, usec))
-    {
+        } while (err != 0 && errno == EINTR);
+    } else if (_sal_compute_timeout(&ts, usec)) {
         /* Treat EAGAIN as a fatal error on Linux */
         err = pthread_mutex_timedlock(&rm->mutex, &ts);
     }
 
-    if (err)
-    {
+    if (err) {
         SAL_WARNING("SAL: take mutex failed[%d]: %s [%d]", err, strerror(errno), errno);
         return -1;
     }
@@ -246,9 +216,8 @@ sal_mutex_take(sal_mutex_t m, INT32 usec)
 }
 
 INT32
-sal_mutex_give(sal_mutex_t m)
-{
-    recursive_mutex_t   *rm = (recursive_mutex_t *) m;
+sal_mutex_give(sal_mutex_t m) {
+    recursive_mutex_t *rm = (recursive_mutex_t *) m;
     INT32 err;
 
     assert(rm);
@@ -264,20 +233,17 @@ sal_mutex_give(sal_mutex_t m)
  * Wrapper class to hold additional info
  * along with the semaphore.
  */
-typedef struct
-{
-    sem_t       s;
-    const char        *desc;
-    INT32         binary;
+typedef struct {
+    sem_t s;
+    const char *desc;
+    INT32 binary;
 } wrapped_sem_t;
 
 sal_sem_t
-sal_sem_create(const char *desc, INT32 binary, INT32 initial_count)
-{
+sal_sem_create(const char *desc, INT32 binary, INT32 initial_count) {
     wrapped_sem_t *s = NULL;
 
-    if ((s = (wrapped_sem_t *)malloc(sizeof (wrapped_sem_t))) == NULL)
-    {
+    if ((s = (wrapped_sem_t *) malloc(sizeof(wrapped_sem_t))) == NULL) {
         return NULL;
     }
 
@@ -296,8 +262,7 @@ sal_sem_create(const char *desc, INT32 binary, INT32 initial_count)
 }
 
 void
-sal_sem_destroy(sal_sem_t b)
-{
+sal_sem_destroy(sal_sem_t b) {
     wrapped_sem_t *s = (wrapped_sem_t *) b;
 
     assert(s);
@@ -308,32 +273,23 @@ sal_sem_destroy(sal_sem_t b)
 }
 
 INT32
-sal_sem_take(sal_sem_t b, INT32 usec)
-{
-    wrapped_sem_t   *s = (wrapped_sem_t *) b;
+sal_sem_take(sal_sem_t b, INT32 usec) {
+    wrapped_sem_t *s = (wrapped_sem_t *) b;
     INT32 err = 0;
 
     struct timespec ts;
 
-    if (usec == sal_sem_FOREVER)
-    {
-        do
-        {
+    if (usec == sal_sem_FOREVER) {
+        do {
             err = sem_wait(&s->s);
-        }
-        while (err != 0 && errno == EINTR);
-    }
-    else if (_sal_compute_timeout(&ts, usec))
-    {
-        while (1)
-        {
-            if (!sem_timedwait(&s->s, &ts))
-            {
+        } while (err != 0 && errno == EINTR);
+    } else if (_sal_compute_timeout(&ts, usec)) {
+        while (1) {
+            if (!sem_timedwait(&s->s, &ts)) {
                 err = 0;
                 break;
             }
-            if (errno != EAGAIN && errno != EINTR)
-            {
+            if (errno != EAGAIN && errno != EINTR) {
                 err = errno;
                 break;
             }
@@ -344,24 +300,19 @@ sal_sem_take(sal_sem_t b, INT32 usec)
 }
 
 INT32
-sal_sem_give(sal_sem_t b)
-{
-    wrapped_sem_t       *s = (wrapped_sem_t *) b;
-    INT32                 err = 0;
-    INT32                 sem_val = 0;
+sal_sem_give(sal_sem_t b) {
+    wrapped_sem_t *s = (wrapped_sem_t *) b;
+    INT32 err = 0;
+    INT32 sem_val = 0;
 
     /* Binary sem only post if sem_val == 0 */
-    if (s->binary)
-    {
+    if (s->binary) {
         /* Post sem on getvalue failure */
         sem_getvalue(&s->s, &sem_val);
-        if (sem_val == 0)
-        {
+        if (sem_val == 0) {
             err = sem_post(&s->s);
         }
-    }
-    else
-    {
+    } else {
         err = sem_post(&s->s);
     }
     return err ? -1 : 0;
@@ -369,12 +320,10 @@ sal_sem_give(sal_sem_t b)
 
 
 // 替换pstrSrting中的所有pstrSrtingOld字符.
-void sal_string_replace(string * pstrSrting, const string * pstrSrtingOld, const string * pstrSrtingNew)
-{
-    for (string::size_type pos(0); pos != string::npos; pos += pstrSrtingOld->length())
-    {
+void sal_string_replace(string *pstrSrting, const string *pstrSrtingOld, const string *pstrSrtingNew) {
+    for (string::size_type pos(0); pos != string::npos; pos += pstrSrtingOld->length()) {
         pos = pstrSrting->find((*pstrSrtingOld), pos);
-        if ( pos != string::npos)
+        if (pos != string::npos)
             pstrSrting->replace(pos, pstrSrtingOld->length(), (*pstrSrtingNew));
         else
             break;

@@ -10,15 +10,13 @@ using namespace std;
 #include "MessagePlatform.h"
 
 // 向Server注册Agent
-INT32 ReportToServer(ServerAntAgentCfg_C * pcCfg)
-{
+INT32 ReportToServer(ServerAntAgentCfg_C *pcCfg) {
 
     return AGENT_OK;
 }
 
 // 获取Server端配置信息
-INT32 GetCfgFromServer(ServerAntAgentCfg_C * pcCfg)
-{
+INT32 GetCfgFromServer(ServerAntAgentCfg_C *pcCfg) {
 
     return AGENT_OK;
 }

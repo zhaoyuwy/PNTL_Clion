@@ -171,15 +171,15 @@ INT32 DetectWorker_C::ThreadHandler()
         // 填充 msg
         sal_memset(&stSendMsg, 0, sizeof(PacketInfo_S));
         sal_memset(aucBuffer, 0, sizeof(aucBuffer));
-        pstSendMsg = (PacketInfo_S*)aucBuffer;
+        pstSendMsg = (PacketInfo_S *) aucBuffer;
 
         // 对端socket地址
         msg.msg_name = &stPrtnerAddr;
         msg.msg_namelen = sizeof(stPrtnerAddr);
 
         // 报文payload接收buffer
-        iov[0].iov_base =  aucBuffer;
-        iov[0].iov_len  = sizeof(PacketInfo_S);
+        iov[0].iov_base = aucBuffer;
+        iov[0].iov_len = sizeof(PacketInfo_S);
         msg.msg_iov = iov;
         msg.msg_iovlen = 1;
 

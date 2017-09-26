@@ -10,11 +10,11 @@
 #include "ServerAntAgentCfg.h"
 
 // 获取Agent本地配置信息
-extern INT32 GetLocalCfg(ServerAntAgentCfg_C * pcCfg);
+extern INT32 GetLocalCfg(ServerAntAgentCfg_C *pcCfg);
 
-extern INT32 GetLocalAgentConfig(FlowManager_C * pcFlowManager);
+extern INT32 GetLocalAgentConfig(FlowManager_C *pcFlowManager);
 
-extern UINT32 GetProbePeriod(FlowManager_C * pcFlowManager);
+extern UINT32 GetProbePeriod(FlowManager_C *pcFlowManager);
 
 
 #endif //PNTL_AGENT_GETLOCALCFG_H

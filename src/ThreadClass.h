@@ -6,26 +6,23 @@
 #define PNTL_AGENT_THREADCLASS_H
 
 
-
 #include <pthread.h>
 #include "Sal.h"
 
-typedef struct tagThreadControl
-{
-    UINT32   uiThreadState;            // 当前Thread状态, 由Thread自行刷新.
-    UINT32   uiThreadInterval;         // Thread运行间隔, 0表示退出, 非0表示运行间隔. (-1)表示不释放CPU, 全速运行.
-    UINT32   uiThreadDefaultInterval;  // Thread默认时间间隔.启动任务时uiThreadInterval的默认值. 单位us, 默认100ms.
+typedef struct tagThreadControl {
+    UINT32 uiThreadState;            // 当前Thread状态, 由Thread自行刷新.
+    UINT32 uiThreadInterval;         // Thread运行间隔, 0表示退出, 非0表示运行间隔. (-1)表示不释放CPU, 全速运行.
+    UINT32 uiThreadDefaultInterval;  // Thread默认时间间隔.启动任务时uiThreadInterval的默认值. 单位us, 默认100ms.
 } ThreadControl_S;
 
 typedef void (*Func)();
 
 // Thread类定义
-class ThreadClass_C
-{
+class ThreadClass_C {
 private:
-    UINT32   uiThreadUpdateInterval;  // 单位us. Thread状态机刷新时间.StopCallBack()下发后,最长ThreadUpdateInterval us内
+    UINT32 uiThreadUpdateInterval;  // 单位us. Thread状态机刷新时间.StopCallBack()下发后,最长ThreadUpdateInterval us内
     // ThreadHandler()应该返回, 否则Thread会被强制终止.
-    UINT32   uiThreadState;           // Thread状态机
+    UINT32 uiThreadState;           // Thread状态机
     pthread_t ThreadFd;                     // Thread句柄.
 
 public:
