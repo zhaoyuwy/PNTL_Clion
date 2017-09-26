@@ -8,10 +8,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
+
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
@@ -334,71 +331,9 @@ INT32 DetectWorker_C::ThreadHandler()
                             continue;
                         }
 
-
-                        // 获取报文中附带的tos信息.
-                        cmsg = CMSG_FIRSTHDR(&msg);
-                        if (cmsg == NULL)
-                        {
-                            DETECT_WORKER_WARNING("RX: Socket can not get cmsg\n");
-                            continue;
-                        }
-                        if ((cmsg->cmsg_level != SOL_IP) ||
-                            (cmsg->cmsg_type != IP_TOS))
-                        {
-                            DETECT_WORKER_WARNING("RX: Cmsg is not IP_TOS, cmsg_level[%d], cmsg_type[%d]",
-                                                  cmsg->cmsg_level, cmsg->cmsg_type);
-                            continue;
-                        }
-                        iTos = ((INT32 *) CMSG_DATA(cmsg))[0];
-
-
-                        PacketNtoH(pstSendMsg);
-
-                        if(WORKER_ROLE_SERVER == pstSendMsg->uiRole)
-                        {
-                            pstSendMsg->stT4.uiSec = tm.tv_sec;
-                            pstSendMsg->stT4.uiUsec = tm.tv_usec;
-                            iRet = RxUpdateSession(pstSendMsg); //刷新sender的会话列表
-
-                            // 若应答报文返回的太晚(Timeout), Sender会话列表已经删除会话, 会返回找不到.
-                            if ((AGENT_OK!= iRet) && (AGENT_E_NOT_FOUND != iRet))
-                                DETECT_WORKER_WARNING("RX: Update Session failed. iRet:[%d]", iRet);
-                        }
-                        else if(WORKER_ROLE_CLIENT == pstSendMsg->uiRole)
-                        {
-                            /*
-                               老版本的Linux kernel, sendmsg时不支持设定tos, recvmsg支持获取tos.
-                               为了兼容老版本, sendmsg时去除msg_control信息, recvmsg时添加msg_control信息.
-                            */
-                            msg.msg_control = NULL;
-                            msg.msg_controllen = 0;
-
-                            // IP_TOS对于stream(TCP)socket不会修改ECN bit, 其他情况下会覆盖ip头中整个tos字段
-                            iRet = setsockopt(iSockFd, SOL_IP, IP_TOS, &iTos, sizeof(iTos));
-                            if( 0 > iRet)
-                            {
-                                DETECT_WORKER_WARNING("RX: Setsockopt IP_TOS failed[%d]: %s [%d]", iRet, strerror(errno), errno);
-                                continue;
-                            }
-
-                            sal_memset(&tm, 0, sizeof(tm));
-                            gettimeofday(&tm,NULL); //获取当前时间
-
-                            pstSendMsg->stT2.uiSec = tm.tv_sec;
-                            pstSendMsg->stT2.uiUsec = tm.tv_usec;
-                            pstSendMsg->stT3.uiSec = tm.tv_sec;
-                            pstSendMsg->stT3.uiUsec = tm.tv_usec;
-                            pstSendMsg->uiRole = WORKER_ROLE_SERVER;
-                            PacketHtoN(pstSendMsg); // 报文payload主机序转网络序
-
-
-                            iRet = sendmsg(iSockFd, &msg, 0);
-                            if (iRet != sizeof(PacketInfo_S) && iRet != sizeof(aucBuffer)) // send failed
-                            {
-                                DETECT_WORKER_WARNING("RX: Send reply packet failed[%d]: %s [%d]", iRet, strerror(errno), errno);
-                            }
-                            sleep(0);
-                        }
+                        iRet = RxUpdateSession(pstSendMsg); //刷新sender的会话列表
+                        if ((AGENT_OK!= iRet) && (AGENT_E_NOT_FOUND != iRet))
+                            DETECT_WORKER_WARNING("RX: Update Session failed. iRet:[%d]", iRet);
                     }
                     break;
 
@@ -879,7 +814,8 @@ bool DetectWorker_C::unpackIcmp(char *buf,int len, struct IcmpEchoReply *icmpEch
         pstSendMsg->stT4.uiSec = tvrecv.tv_sec;
         pstSendMsg->stT4.uiUsec = tvrecv.tv_usec;
 //        rtt=tvresult.tv_sec*1000 + tvresult.tv_usec/1000;  /*以毫秒为单位计算rtt*/
-        icmpEchoReply->rtt = pstSendMsg->stT4-pstSendMsg->stT1;
+        icmpEchoReply->rtt = (pstSendMsg->stT4-pstSendMsg->stT1);
+        printf("@@@@@@@@@@@@@@@@@@@@@@@@@@@ icmpEchoReply->rtt   %f\n",icmpEchoReply->rtt);
         icmpEchoReply->icmpSeq = icmp->icmp_seq;
         icmpEchoReply->ipTtl = ip->ip_ttl;
         icmpEchoReply->icmpLen = len;
@@ -947,6 +883,7 @@ int DetectWorker_C::packIcmp(int pack_no, struct icmp* icmp,PacketInfo_S* pstSen
     memcpy(&icmp->icmp_data,pstSendMsg,sizeof(PacketInfo_S));
 
     printf("@@@@@@@@@@@@@@@@@@@@@@@@@@@ %ul",sizeof(PacketInfo_S));
+
 //    gettimeofday(tval,NULL);    /*记录发送时间*/
 //    printf("tval->tv_sec %s, tval->tv_usec %s",tval->tv_sec,tval->tv_usec);
     picmp->icmp_cksum=getChksum((unsigned short *)icmp,packsize); /*校验算法*/

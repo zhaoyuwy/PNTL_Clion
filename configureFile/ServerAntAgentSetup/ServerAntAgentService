@@ -1,0 +1,240 @@
+#! /bin/sh
+
+# /etc/init.d/ServerAntAgentService
+#   and its symbolic link
+# /opt/huawei/ServerAntAgent/StartService.sh
+
+### BEGIN INIT INFO
+# Provides:       ServerAntAgentService
+# Required-Start: $network
+# Required-Stop:  $network
+# Default-Start:  3 5
+# Default-Stop:   0 1 2 6
+# Short-Description: ServerAntAgentService for dc-ants
+# Description:    ServerAntAgentService for dc-ants
+### END INIT INFO
+
+# Service Name (will be updated by install script)
+SERVICE_NAME="ServerAntAgent"
+
+# run service as user SERVICE_USER_NAME (will be updated by install script)
+SERVICE_USER_NAME="root"
+
+# Service File (will be updated by install script)
+SERVICE_INSTALL_DIR="/opt/huawei/ServerAntAgent"
+START_SERVICE_BIN="${SERVICE_INSTALL_DIR}/StartService.sh"
+STOP_SERVICE_BIN="${SERVICE_INSTALL_DIR}/StopService.sh"
+CHECK_SERVICE_BIN="${SERVICE_INSTALL_DIR}/CheckService.sh"
+# Service PID info (will be updated by install script)
+SERVICE_PID_FILE="/var/run/ServerAntAgent/ServerAntAgent.pid"
+
+# Service CMD
+START_SERVICE_CMD="cd $(dirname ${START_SERVICE_BIN}); sh ${START_SERVICE_BIN} -d"
+STOP_SERVICE_CMD="cd $(dirname ${STOP_SERVICE_BIN}); sh ${STOP_SERVICE_BIN}"
+CHECK_SERVICE_CMD="cd $(dirname ${CHECK_SERVICE_BIN}); sh ${CHECK_SERVICE_BIN}"
+
+# cgroup_root config
+CGROUP_MOUNT_ROOT_CMD="mount -t tmpfs cgroup_root "
+#CGROUP_ROOT_DIR="/mnt/cgroup"
+CGROUP_ROOT_DIR="/sys/fs/cgroup"
+
+# cgroup cpu module config
+CGROUP_MOUNT_CPU_CMD="mount -t cgroup -o cpu none "
+CGROUP_MOUNT_CPU_DIR="${CGROUP_ROOT_DIR}/cpu"
+# cgroup cpu module config for ServerAntAgent
+CGROUP_AGENT_CPU_DIR="${CGROUP_MOUNT_CPU_DIR}/${SERVICE_NAME}"
+#CGROUP_AGENT_CPU_QUOTE_FILE="${CGROUP_AGENT_CPU_DIR}/cpu.cfs_quota_us"
+CGROUP_AGENT_CPU_SHARE_FILE="${CGROUP_AGENT_CPU_DIR}/cpu.shares"
+CGROUP_AGENT_CPU_TASKS_FILE="${CGROUP_AGENT_CPU_DIR}/tasks"
+
+# cgroup memory module config
+CGROUP_MOUNT_MEMORY_CMD="mount -t cgroup -o memory none "
+CGROUP_MOUNT_MEMORY_DIR="${CGROUP_ROOT_DIR}/memory"
+# cgroup memory module config for ServerAntAgent
+CGROUP_AGENT_MEMORY_DIR="${CGROUP_MOUNT_MEMORY_DIR}/${SERVICE_NAME}"
+CGROUP_AGENT_MEMORY_LIMIT_FILE="${CGROUP_AGENT_MEMORY_DIR}/memory.limit_in_bytes"
+CGROUP_AGENT_MEMORY_TASKS_FILE="${CGROUP_AGENT_MEMORY_DIR}/tasks"
+
+# Task/TaskGroup default Weight is 1024, Limit ServerAntAgent to 100.
+# If Task A/B/ServerAntAgent always in rq,  A get 1024/(1024+1024+100) cpu time, B get 1024/(1024+1024+100) cpu time, ServerAntAgent get 100/(1024+1024+100) cpu time.
+# ServerAntAgent will not always in rq.
+CGROUP_CPU_SHARE_WEIGHT=100
+# ServerAntAgent mem limit 300M (rss + cache), need test.
+CGROUP_MEM_LIMIT_IN_BYTES=300M
+# net limit need net_cls and tc/qdisc config, it's too heavy.
+CGROUP_TASK_PID_FILE=${SERVICE_PID_FILE}
+
+# Service Control
+. /etc/rc.status
+rc_reset
+
+# Check for missing binary
+if [ ! -x ${START_SERVICE_BIN} ]; then
+	echo -n >&2 "${SERVICE_NAME}Service, ${START_SERVICE_BIN} is not installed. "
+	rc_status -s
+	exit 5
+fi
+
+case "$1" in
+	start)
+		echo "Starting ${SERVICE_NAME}Service "
+        
+        # prepare PID dir
+        mkdir -p $(dirname ${SERVICE_PID_FILE})
+        chown ${SERVICE_USER_NAME} $(dirname ${SERVICE_PID_FILE}) -R
+    
+        # start START_SERVICE_BIN with SERVICE_USER_NAME
+        su - ${SERVICE_USER_NAME} -c  "${START_SERVICE_CMD}"
+        if [ $? != 0 ]; then
+            echo "Error: Start ${START_SERVICE_BIN} failed"
+            rc_failed 
+            rc_status -v
+            rc_exit
+        fi
+        
+        # mkdir for cgroup_root
+        mkdir -p ${CGROUP_ROOT_DIR}
+        if [ $? != 0 ]; then
+            echo "Error: mkdir for cgroup_root ${CGROUP_ROOT_DIR} failed"
+            rc_failed 
+            rc_status -v
+            rc_exit
+        fi
+        
+        # check cgroup fs status
+        if [ ! "$(ls -A ${CGROUP_ROOT_DIR})" ]; then
+            # need mount cgroup root dir
+            echo "mount ${CGROUP_ROOT_DIR}"
+            ${CGROUP_MOUNT_ROOT_CMD} ${CGROUP_ROOT_DIR}
+            if [ $? != 0 ]; then
+                echo "Error: Mount cgroup to ${CGROUP_ROOT_DIR} failed"
+                rc_failed 
+                rc_status -v
+                rc_exit
+            fi
+        fi
+        
+        # mount cgroup cpu module
+        mkdir -p ${CGROUP_MOUNT_CPU_DIR}
+        # check cgroup cpu modul status
+        if [ ! "$(ls -A ${CGROUP_MOUNT_CPU_DIR})" ]; then
+            # need mount cgroup cpu dir
+            echo "mount ${CGROUP_MOUNT_CPU_DIR}"
+            ${CGROUP_MOUNT_CPU_CMD} ${CGROUP_MOUNT_CPU_DIR}
+            if [ $? != 0 ]; then
+                echo "Error: Mount cgroup cpu to ${CGROUP_MOUNT_CPU_DIR} failed"
+                rc_failed 
+                rc_status -v
+                rc_exit
+            fi
+        fi
+        # create a new sub cgroup in cpu module
+        mkdir -p ${CGROUP_AGENT_CPU_DIR}
+        # modify cpu share weight
+        echo ${CGROUP_CPU_SHARE_WEIGHT} > ${CGROUP_AGENT_CPU_SHARE_FILE}
+        # add ServerAntAgent task to current cgroup.
+        if test -e "${CGROUP_TASK_PID_FILE}" ; then 
+            cat ${CGROUP_TASK_PID_FILE} > ${CGROUP_AGENT_CPU_TASKS_FILE}
+        else
+            echo "Error: Can not find pid file ${CGROUP_TASK_PID_FILE}"
+            rmdir ${CGROUP_AGENT_CPU_DIR}
+            rc_failed 
+            rc_status -v
+            rc_exit
+        fi
+        
+        # mount cgroup memory module
+        mkdir -p ${CGROUP_MOUNT_MEMORY_DIR}
+        # check cgroup memory modul status
+        if [ ! "$(ls -A ${CGROUP_MOUNT_MEMORY_DIR})" ]; then
+            # need mount cgroup memory dir
+            echo "mount ${CGROUP_MOUNT_MEMORY_DIR}"
+            ${CGROUP_MOUNT_MEMORY_CMD} ${CGROUP_MOUNT_MEMORY_DIR}
+            if [ $? != 0 ]; then
+                echo "Error: Mount cgroup memory to ${CGROUP_MOUNT_MEMORY_DIR} failed"
+                rc_failed 
+                rc_status -v
+                rc_exit
+            fi
+        fi
+        # create a new sub cgroup in memory module
+        mkdir -p ${CGROUP_AGENT_MEMORY_DIR}
+        # modify memory limit
+        echo ${CGROUP_MEM_LIMIT_IN_BYTES} > ${CGROUP_AGENT_MEMORY_LIMIT_FILE}
+        # add ServerAntAgent task to current cgroup.
+        if test -e "${CGROUP_TASK_PID_FILE}" ; then 
+            cat ${CGROUP_TASK_PID_FILE} > ${CGROUP_AGENT_MEMORY_TASKS_FILE}
+        else
+            echo "Error: Can not find pid file ${CGROUP_TASK_PID_FILE}"
+            rmdir ${CGROUP_AGENT_MEMORY_DIR}
+            rc_failed 
+            rc_status -v
+            rc_exit
+        fi
+        
+        rc_status -v
+		;;
+	stop)
+		echo "Shutting down ${SERVICE_NAME}Service "
+        
+        # stop START_SERVICE_BIN with SERVICE_USER_NAME
+        su - ${SERVICE_USER_NAME} -c  "${STOP_SERVICE_CMD}"
+        if [ $? != 0 ]; then
+            echo "Error: Stop ${START_SERVICE_BIN} failed"
+            rc_failed 
+            rc_status -v
+            rc_exit
+        fi
+        
+        # remove config cgroup
+        if [ -d "${CGROUP_AGENT_CPU_DIR}" ]; then
+            # remove
+            rmdir ${CGROUP_AGENT_CPU_DIR}
+            if [ $? != 0 ]; then
+                echo "Error: Remove cgroup ${CGROUP_AGENT_CPU_DIR} failed"
+                rc_failed 
+                rc_status -v
+                rc_exit
+            fi
+        fi
+        
+        if [ -d "${CGROUP_AGENT_MEMORY_DIR}" ]; then
+            # remove
+            rmdir ${CGROUP_AGENT_MEMORY_DIR}
+            if [ $? != 0 ]; then
+                echo "Error: Remove cgroup ${CGROUP_AGENT_MEMORY_DIR} failed"
+                rc_failed 
+                rc_status -v
+                rc_exit
+            fi
+        fi
+        
+        rc_status -v
+		;;
+	try-restart)
+		$0 status
+		if test $? = 0; then
+			$0 restart
+		else 
+			rc_reset
+		fi
+		rc_status
+		;;
+	restart)
+		$0 stop
+		$0 start
+		rc_status
+		;;
+	status)
+		echo "Checking for ${SERVICE_NAME}Service "
+        
+        su - ${SERVICE_USER_NAME} -c  "${CHECK_SERVICE_CMD}"
+        
+        rc_status -v
+		;;
+	*)
+		echo "Usage: $0 {start|stop|status|try-restart|restart}"
+		exit 1
+		;;
+esac
+rc_exit
