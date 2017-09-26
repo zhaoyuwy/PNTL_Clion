@@ -230,9 +230,9 @@ public:
     INT32 PopSession(DetectWorkerSession_S*
     pOldSession);               // 查询探测结果, FlowManage使用.
 
-    int packIcmp(int pack_no, struct icmp* icmp);
+    int packIcmp(int pack_no, struct icmp* icmp,PacketInfo_S* stSendMsg);
     unsigned short getChksum(unsigned short *addr,int len);
-    bool unpackIcmp(char *buf,int len, struct IcmpEchoReply *icmpEchoReply);
+    bool unpackIcmp(char *buf,int len, struct IcmpEchoReply *icmpEchoReply,PacketInfo_S* pstSendMsg);
     INT32 m_nsend;
     INT32 m_icmp_seq ;
 

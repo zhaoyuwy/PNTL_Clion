@@ -19,7 +19,7 @@
 #include <netinet/ip_icmp.h>
 
 #include "AgentCommon.h"
-
+#include <netdb.h>
 #define UDP_TEST_PORT       6000
 #define UDP_SERVER_IP       "127.0.0.1"
 
@@ -318,9 +318,9 @@ INT32 DetectWorker_C::ThreadHandler()
 //                    socklen_t fromlen = sizeof(m_from_addr);
 
                     iRet = recvfrom(iSockFd, &m_recvpacket,sizeof(m_recvpacket),0, (struct sockaddr *)&m_from_addr,&fromlen);
-                    DETECT_WORKER_INFO("$$$$$$$$$$$$$$$$ Recived uiIsBigPkg Msg size [%d]", iRet);
-                    if (iRet == sizeof(PacketInfo_S) || iRet == sizeof(aucBuffer)||iRet==sizeof(m_recvpacket))
-//                    if (iRet>-1)
+                    DETECT_WORKER_INFO("$$$$$$$$$$$$$$$$ Recived uiIsBigPkg Msg size [%d]    [%d]", iRet,sizeof(m_recvpacket));
+//                    if (iRet == sizeof(PacketInfo_S) || iRet == sizeof(aucBuffer)||iRet==sizeof(m_recvpacket))
+                    if (iRet>-1)
                     {
                         sal_memset(&tm, 0, sizeof(tm));
                         gettimeofday(&tm,NULL); //获取当前时间
@@ -328,7 +328,7 @@ INT32 DetectWorker_C::ThreadHandler()
 
                         icmpEchoReply.fromAddr = inet_ntoa(m_from_addr.sin_addr) ;
 
-                        if(unpackIcmp(m_recvpacket, len, &icmpEchoReply)==-1) {
+                        if(unpackIcmp(m_recvpacket, len, &icmpEchoReply,pstSendMsg)==-1) {
                             //retry again
 
                             continue;
@@ -564,8 +564,11 @@ INT32 DetectWorker_C::InitSocket()
     pcAgentCfg ->GetProtocolUDP(&uiSrcPortMin, &uiSrcPortMax, &uiDestPort);
 
     ReleaseSocket();
-
+    struct protoent *protocol;
+    m_nsend = 0;
+    m_nreceived = 0;
     // 根据协议类型, 创建对应socket.
+    int size = 50*1024;
     switch (stCfg.eProtocol)
     {
         case AGENT_DETECT_PROTOCOL_UDP:
@@ -589,8 +592,12 @@ INT32 DetectWorker_C::InitSocket()
             }
             break;
         case AGENT_DETECT_PROTOCOL_ICMP:
-//            const int val =255;
-            SocketTmp = socket(AF_INET, SOCK_RAW,IPPROTO_ICMP);
+            if( (protocol = getprotobyname("icmp") )==NULL)
+            {
+                perror("getprotobyname");
+                return false;
+            }
+            SocketTmp = socket(AF_INET, SOCK_RAW,protocol->p_proto);
             if( SocketTmp == -1 )
             {
                 DETECT_WORKER_ERROR("Create socket failed[%d]: %s [%d]", SocketTmp, strerror(errno), errno);
@@ -601,14 +608,16 @@ INT32 DetectWorker_C::InitSocket()
 //            servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
             servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
             servaddr.sin_port = 0;
-
-            if( bind(SocketTmp, (struct sockaddr*)&servaddr, sizeof(servaddr)) == -1)
-            {
-                DETECT_WORKER_WARNING("Bind socket failed, SrcIP[%s],SrcPort[%d]: %s [%d]",
-                                      sal_inet_ntoa(stCfg.uiSrcIP), stCfg.uiSrcPort, strerror(errno), errno);
-                close(SocketTmp);
-                return AGENT_E_SOCKET;
-            }
+            setsockopt(SocketTmp,SOL_SOCKET,SO_RCVBUF,&size,sizeof(size) );
+//            if( bind(SocketTmp, (struct sockaddr*)&servaddr, sizeof(servaddr)) == -1)
+//            {
+//                DETECT_WORKER_WARNING("Bind socket failed, SrcIP[%s],SrcPort[%d]: %s [%d]",
+//                                      sal_inet_ntoa(stCfg.uiSrcIP), stCfg.uiSrcPort, strerror(errno), errno);
+//                close(SocketTmp);
+//                return AGENT_E_SOCKET;
+//            }
+//            DETECT_WORKER_WARNING("Bind socket failed, SrcIP[%s],SrcPort[%d]: %s [%d]",
+//                                  sal_inet_ntoa(stCfg.uiSrcIP), stCfg.uiSrcPort, strerror(errno), errno);
             break;
         default:
             DETECT_WORKER_ERROR("Unsupported Protocol[%d]",stCfg.eProtocol);
@@ -712,6 +721,14 @@ INT32 DetectWorker_C::TxPacket(DetectWorkerSession_S*
         pNewSession->stT1 = stSendMsg.stT1; //保存T1时间
     }
 
+    if(AGENT_DETECT_PROTOCOL_ICMP == pNewSession->stFlowKey.eProtocol ){
+        sal_memset(aucBuff, 0, sizeof(aucBuff));
+        pstSendMsg->uiSequenceNumber = pNewSession->uiSequenceNumber;
+        pstSendMsg->stT1.uiSec = tm.tv_sec;
+        pstSendMsg->stT1.uiUsec = tm.tv_usec;
+        pstSendMsg->uiRole = WORKER_ROLE_CLIENT;
+        pNewSession->stT1 = pstSendMsg->stT1; //保存T1时间
+    }
     // 检查socket是否已经ready
     if( 0 == GetSocket())
     {
@@ -787,7 +804,7 @@ INT32 DetectWorker_C::TxPacket(DetectWorkerSession_S*
 
             size_t packetsize;
             m_icmp_seq++;
-            packetsize = packIcmp(m_icmp_seq,(struct icmp*)m_sendpacket);
+            packetsize = packIcmp(m_icmp_seq,(struct icmp*)m_sendpacket,pstSendMsg);
 
             if (pNewSession->stFlowKey.uiIsBigPkg)
             {
@@ -800,7 +817,7 @@ INT32 DetectWorker_C::TxPacket(DetectWorkerSession_S*
 
                 PacketHtoN(&stSendMsg);// 主机序转网络序
                 iRet = sendto(GetSocket(), &m_sendpacket, packetsize, 0, (sockaddr *)&servaddr, sizeof(servaddr));
-                DETECT_WORKER_INFO("$$$$$$$$$$$$$$$$Send ICMP Msg size [%d]", iRet);
+                DETECT_WORKER_INFO("$$$$$$$$$$$$$$$$Send ICMP Msg size [%d]               packetsize %d ", iRet,packetsize);
             }
 
 
@@ -828,12 +845,15 @@ INT32 DetectWorker_C::TxPacket(DetectWorkerSession_S*
     return iRet;
 }
 /*发送三个ICMP报文*/
-bool DetectWorker_C::unpackIcmp(char *buf,int len, struct IcmpEchoReply *icmpEchoReply)
+bool DetectWorker_C::unpackIcmp(char *buf,int len, struct IcmpEchoReply *icmpEchoReply,PacketInfo_S* pstSendMsg)
 {
     int i,iphdrlen;
     struct ip *ip;
     struct icmp *icmp;
     struct timeval *tvsend, tvrecv, tvresult;
+
+
+//    PacketHtoN(pstSendMsg);
     double rtt;
 
     ip = (struct ip *)buf;
@@ -850,10 +870,16 @@ bool DetectWorker_C::unpackIcmp(char *buf,int len, struct IcmpEchoReply *icmpEch
     {
 
         tvsend=(struct timeval *)icmp->icmp_data;
+        pstSendMsg= (PacketInfo_S*)(icmp->icmp_data);
+
         gettimeofday(&tvrecv,NULL);  /*记录接收时间*/
+        pstSendMsg->stT1;
         tvresult = tvSub(tvrecv, *tvsend);  /*接收和发送的时间差*/
-        rtt=tvresult.tv_sec*1000 + tvresult.tv_usec/1000;  /*以毫秒为单位计算rtt*/
-        icmpEchoReply->rtt = rtt;
+
+        pstSendMsg->stT4.uiSec = tvrecv.tv_sec;
+        pstSendMsg->stT4.uiUsec = tvrecv.tv_usec;
+//        rtt=tvresult.tv_sec*1000 + tvresult.tv_usec/1000;  /*以毫秒为单位计算rtt*/
+        icmpEchoReply->rtt = pstSendMsg->stT4-pstSendMsg->stT1;
         icmpEchoReply->icmpSeq = icmp->icmp_seq;
         icmpEchoReply->ipTtl = ip->ip_ttl;
         icmpEchoReply->icmpLen = len;
@@ -902,11 +928,11 @@ unsigned short DetectWorker_C::getChksum(unsigned short *addr,int len)
     answer=~sum;
     return answer;
 }
-int DetectWorker_C::packIcmp(int pack_no, struct icmp* icmp)
+int DetectWorker_C::packIcmp(int pack_no, struct icmp* icmp,PacketInfo_S* pstSendMsg)
 {
     int i,packsize;
     struct icmp *picmp;
-    struct timeval *tval;
+//    struct timeval *tval;
 
     picmp = icmp;
     picmp->icmp_type=ICMP_ECHO;
@@ -915,9 +941,16 @@ int DetectWorker_C::packIcmp(int pack_no, struct icmp* icmp)
     picmp->icmp_seq=pack_no;
     picmp->icmp_id= m_pid;
     packsize= 8 + m_datalen;
-    tval= (struct timeval *)icmp->icmp_data;
-    gettimeofday(tval,NULL);    /*记录发送时间*/
+//    pstSendMsg= (PacketInfo_S*)(*icmp->icmp_data);
+//    pstSendMsg= (PacketInfo_S*)(*icmp->icmp_data);
+//    (PacketInfo_S*) icmp->icmp_data = pstSendMsg;
+    memcpy(&icmp->icmp_data,pstSendMsg,sizeof(PacketInfo_S));
+
+    printf("@@@@@@@@@@@@@@@@@@@@@@@@@@@ %ul",sizeof(PacketInfo_S));
+//    gettimeofday(tval,NULL);    /*记录发送时间*/
+//    printf("tval->tv_sec %s, tval->tv_usec %s",tval->tv_sec,tval->tv_usec);
     picmp->icmp_cksum=getChksum((unsigned short *)icmp,packsize); /*校验算法*/
+//    PacketNtoH((PacketInfo_S*)icmp->icmp_data);
     return packsize;
 }
 // 添加探测任务, FlowManage使用.
