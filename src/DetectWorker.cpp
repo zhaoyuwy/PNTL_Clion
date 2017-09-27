@@ -330,7 +330,12 @@ INT32 DetectWorker_C::ThreadHandler()
 
                             continue;
                         }
+//                        struct timeval tvrecv;
+//                        gettimeofday(&tvrecv,NULL);  /*记录接收时间*/
 
+//                        pstSendMsg->stT4.uiSec = tvrecv.tv_sec;
+//                        pstSendMsg->stT4.uiUsec = tvrecv.tv_usec;
+                        printf("$$$$$$$$$$$$$$$$$$$$$$$$$ t1=  %ul,   t4 = %ul\n",pstSendMsg->stT1.uiSec,pstSendMsg->stT4.uiSec);
                         iRet = RxUpdateSession(pstSendMsg); //刷新sender的会话列表
                         if ((AGENT_OK!= iRet) && (AGENT_E_NOT_FOUND != iRet))
                             DETECT_WORKER_WARNING("RX: Update Session failed. iRet:[%d]", iRet);
@@ -780,7 +785,7 @@ INT32 DetectWorker_C::TxPacket(DetectWorkerSession_S*
     return iRet;
 }
 /*发送三个ICMP报文*/
-bool DetectWorker_C::unpackIcmp(char *buf,int len, struct IcmpEchoReply *icmpEchoReply,PacketInfo_S* pstSendMsg)
+bool DetectWorker_C::unpackIcmp(char *buf,int len, struct IcmpEchoReply *icmpEchoReply,PacketInfo_S *pstSendMsg)
 {
     int i,iphdrlen;
     struct ip *ip;
@@ -805,14 +810,17 @@ bool DetectWorker_C::unpackIcmp(char *buf,int len, struct IcmpEchoReply *icmpEch
     {
 
         tvsend=(struct timeval *)icmp->icmp_data;
-        pstSendMsg= (PacketInfo_S*)(icmp->icmp_data);
+        PacketInfo_S *pstSendMsgTemp= (PacketInfo_S*)(icmp->icmp_data);
 
         gettimeofday(&tvrecv,NULL);  /*记录接收时间*/
         pstSendMsg->stT1;
         tvresult = tvSub(tvrecv, *tvsend);  /*接收和发送的时间差*/
 
-        pstSendMsg->stT4.uiSec = tvrecv.tv_sec;
-        pstSendMsg->stT4.uiUsec = tvrecv.tv_usec;
+        pstSendMsgTemp->stT4.uiSec = tvrecv.tv_sec;
+        pstSendMsgTemp->stT4.uiUsec = tvrecv.tv_usec;
+
+        memcpy(pstSendMsg,pstSendMsgTemp,sizeof(PacketInfo_S));
+
 //        rtt=tvresult.tv_sec*1000 + tvresult.tv_usec/1000;  /*以毫秒为单位计算rtt*/
         icmpEchoReply->rtt = (pstSendMsg->stT4-pstSendMsg->stT1);
         printf("@@@@@@@@@@@@@@@@@@@@@@@@@@@ icmpEchoReply->rtt   %f\n",icmpEchoReply->rtt);
