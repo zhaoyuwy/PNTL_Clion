@@ -45,7 +45,7 @@ const UINT32 STOP_AGENT = 0;
 
 typedef enum tagAgentDetectProtocolType {
     AGENT_DETECT_PROTOCOL_NULL = 0,   // 未配置
-    AGENT_DETECT_PROTOCOL_ICMP,       // ICMP, 预计要支持
+    AGENT_DETECT_PROTOCOL_ICMP,       // ICMP,更改支持  201709281556
     AGENT_DETECT_PROTOCOL_UDP,        // UDP, 支持
     AGENT_DETECT_PROTOCOL_TCP,        // TCP,暂不支持
     AGENT_DETECT_PROTOCOL_MAX
