@@ -216,9 +216,7 @@ INT32 ReportDataToServer(ServerAntAgentCfg_C *pcAgentCfg, stringstream *pstrRepo
 
     return iRet;
 }
-//gongneng tiaoshi pingbi
-//extern bool IS_DEBUG = false;
-extern bool IS_DEBUG = true;
+
 INT32 ReportAgentIPToServer(ServerAntAgentCfg_C *pcAgentCfg) {
     INT32 iRet = AGENT_OK;
 

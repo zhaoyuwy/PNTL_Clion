@@ -117,7 +117,8 @@ DetectWorker_C::~DetectWorker_C()
 
 }
 
-
+extern bool IS_DEBUG = true;
+//extern bool IS_DEBUG = false;
 // Thread回调函数.
 // PreStopHandler()执行后, ThreadHandler()需要在GetCurrentInterval() us内主动退出.
 INT32 DetectWorker_C::ThreadHandler()
@@ -199,7 +200,7 @@ INT32 DetectWorker_C::ThreadHandler()
                            iSockFd, stCfg.eProtocol,stCfg.uiSrcPort, GetCurrentInterval(), stCfg.uiRole);
         struct IcmpEchoReply icmpEchoReply;
 
-        int len;
+        int len = 32664;
         while (GetCurrentInterval())
         {
             switch (stCfg.eProtocol)
@@ -335,7 +336,9 @@ INT32 DetectWorker_C::ThreadHandler()
 
 //                        pstSendMsg->stT4.uiSec = tvrecv.tv_sec;
 //                        pstSendMsg->stT4.uiUsec = tvrecv.tv_usec;
-                        printf("$$$$$$$$$$$$$$$$$$$$$$$$$ t1=  %ul,   t4 = %ul\n",pstSendMsg->stT1.uiSec,pstSendMsg->stT4.uiSec);
+                        printf("$$$$$$$$$$$$$$$$$$$$$$$$$ 444444    stT1.uiSec  %u,   stT1.uiUSec = %u\n",pstSendMsg->stT1.uiSec,pstSendMsg->stT1.uiUsec);
+                        printf("$$$$$$$$$$$$$$$$$$$$$$$$$ 444444    stT4.uiSec=  %u,   stT4.uiUSec = %u\n",pstSendMsg->stT4.uiSec,pstSendMsg->stT4.uiUsec);
+                        printf("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$rtt time is %d\n",pstSendMsg->stT4-pstSendMsg->stT1);
                         iRet = RxUpdateSession(pstSendMsg); //刷新sender的会话列表
                         if ((AGENT_OK!= iRet) && (AGENT_E_NOT_FOUND != iRet))
                             DETECT_WORKER_WARNING("RX: Update Session failed. iRet:[%d]", iRet);
@@ -787,6 +790,8 @@ INT32 DetectWorker_C::TxPacket(DetectWorkerSession_S*
 /*发送三个ICMP报文*/
 bool DetectWorker_C::unpackIcmp(char *buf,int len, struct IcmpEchoReply *icmpEchoReply,PacketInfo_S *pstSendMsg)
 {
+
+    printf("11111111111111111$$$$$$$$$$$$$$$$$$$$$$$$$ len  = %d \n",len);
     int i,iphdrlen;
     struct ip *ip;
     struct icmp *icmp;
@@ -800,6 +805,9 @@ bool DetectWorker_C::unpackIcmp(char *buf,int len, struct IcmpEchoReply *icmpEch
     iphdrlen = ip->ip_hl << 2;    /*求ip报头长度,即ip报头的长度标志乘4*/
     icmp = (struct icmp *)(buf + iphdrlen);  /*越过ip报头,指向ICMP报头*/
     len -= iphdrlen;            /*ICMP报头及ICMP数据报的总长度*/
+
+    printf("1111111111111111111111111111111$$$$$$$$$$$$$$$$$$$$$ iphdrlen  = %d \n",iphdrlen);
+    printf("2222222222222222222222$$$$$$$$$$$$$$$$$$$$$$$$$ len  = %d \n",len);
     if(len < 8)                /*小于ICMP报头长度则不合理*/
     {
         printf("ICMP packets\'s length is less than 8\n");
@@ -818,8 +826,10 @@ bool DetectWorker_C::unpackIcmp(char *buf,int len, struct IcmpEchoReply *icmpEch
 
         pstSendMsgTemp->stT4.uiSec = tvrecv.tv_sec;
         pstSendMsgTemp->stT4.uiUsec = tvrecv.tv_usec;
-
+        printf("$$$$$$$$$$$$$$$$$$$$$$$$$ 1111111111111111111111 t1=  %ul,   t4 = %ul\n",pstSendMsgTemp->stT1.uiSec,pstSendMsgTemp->stT4.uiSec);
+        printf("$$$$$$$$$$$$$$$$$$$$$$$$$ 2222222222222222222222 t1=  %ul,   t4 = %ul\n",pstSendMsg->stT1.uiSec,pstSendMsg->stT4.uiSec);
         memcpy(pstSendMsg,pstSendMsgTemp,sizeof(PacketInfo_S));
+        printf("$$$$$$$$$$$$$$$$$$$$$$$$$ 2222222222222222222222 t1=  %ul,   t4 = %ul\n",pstSendMsg->stT1.uiSec,pstSendMsg->stT4.uiSec);
 
 //        rtt=tvresult.tv_sec*1000 + tvresult.tv_usec/1000;  /*以毫秒为单位计算rtt*/
         icmpEchoReply->rtt = (pstSendMsg->stT4-pstSendMsg->stT1);
@@ -890,7 +900,8 @@ int DetectWorker_C::packIcmp(int pack_no, struct icmp* icmp,PacketInfo_S* pstSen
 //    (PacketInfo_S*) icmp->icmp_data = pstSendMsg;
     memcpy(&icmp->icmp_data,pstSendMsg,sizeof(PacketInfo_S));
 
-    printf("@@@@@@@@@@@@@@@@@@@@@@@@@@@ %ul",sizeof(PacketInfo_S));
+    printf("@@@@@@@@@@@@@@@@@@@@@@@@@@@ %ul\n",sizeof(PacketInfo_S));
+    printf("@@@@@@@@@@@@@@@@MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM@@@@@@@@@@@ %ul\n",sizeof(timeval));
 
 //    gettimeofday(tval,NULL);    /*记录发送时间*/
 //    printf("tval->tv_sec %s, tval->tv_usec %s",tval->tv_sec,tval->tv_usec);
