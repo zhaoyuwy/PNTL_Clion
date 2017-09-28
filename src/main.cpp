@@ -95,7 +95,9 @@ INT32 ServerAntAgent() {
     UINT32 reportCount = 1;
     do {
 //        liantiaopingbi
-//        iRet = ReportAgentIPToServer(pcCfg);
+        if(!IS_DEBUG) {
+            iRet = ReportAgentIPToServer(pcCfg);
+        }
         if (AGENT_OK != iRet) {
             INIT_ERROR("Report Agent ip to Server fail[%d]", iRet);
             sleep(5 * reportCount);
