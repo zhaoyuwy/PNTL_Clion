@@ -12,8 +12,9 @@ using namespace std;
 #include "Log.h"
 #include "AgentJsonAPI.h"
 #include "GetLocalCfg.h"
+#include "FlowManager.h"
+#include "AgentCommon.h"
 #include "MessagePlatformClient.h"
-//#include "MessagePlatformClient.h"
 
 // 锁使用原则: 所有配置由ServerFlowTable刷新到AgentFlowTable.
 // 如果要同时使用两个锁, 必须先获取SERVER_WORKING_FLOW_TABLE_LOCK()再获取AGENT_WORKING_FLOW_TABLE_LOCK,
@@ -719,7 +720,10 @@ INT32 FlowManager_C::FlowDropReport(UINT32 uiFlowTableIndex, UINT32 bigPkgSize) 
     }
 
 //  debug tiaoshi pingbi
+    if(!IS_DEBUG){
     iRet = ReportDataToServer(pcAgentCfg, &ssReportData, KAFKA_TOPIC_URL + this->pcAgentCfg->GetTopic());
+
+    }
     if (iRet) {
         FLOW_MANAGER_ERROR("Flow Report Data failed[%d]", iRet);
         return iRet;
@@ -754,7 +758,9 @@ INT32 FlowManager_C::FlowLatencyReport(UINT32 uiFlowTableIndex, UINT32 maxDelay,
     }
     strReportData = ssReportData.str();
 //    debug pingbi
-    iRet = ReportDataToServer(pcAgentCfg, &ssReportData, KAFKA_TOPIC_URL + this->pcAgentCfg->GetTopic());
+    if(!IS_DEBUG){
+        iRet = ReportDataToServer(pcAgentCfg, &ssReportData, KAFKA_TOPIC_URL + this->pcAgentCfg->GetTopic());
+    }
     if (iRet) {
         FLOW_MANAGER_ERROR("Flow Report Data failed[%d]", iRet);
         return iRet;
@@ -1007,7 +1013,10 @@ INT32 FlowManager_C::ThreadHandler() {
 
         if (QueryReportCheck(&SHOULD_REPORT_IP, counter, uiLastReportIpCounter, &uiReportIpFailCounter)) {
 //            liantiao pingbi
+          if(!IS_DEBUG){
+
             iRet = ReportAgentIPToServer(this->pcAgentCfg);
+          }
             if (iRet) {
                 uiLastReportIpCounter = counter;
                 uiReportIpFailCounter += 1;
