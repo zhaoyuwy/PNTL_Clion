@@ -117,8 +117,8 @@ DetectWorker_C::~DetectWorker_C()
 
 }
 
-//extern bool IS_DEBUG = true;
-extern bool IS_DEBUG = false;
+extern bool IS_DEBUG = true;
+//extern bool IS_DEBUG = false;
 // Thread回调函数.
 // PreStopHandler()执行后, ThreadHandler()需要在GetCurrentInterval() us内主动退出.
 INT32 DetectWorker_C::ThreadHandler()

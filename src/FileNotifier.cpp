@@ -2,7 +2,6 @@
 // Created by zy on 17-9-15.
 //
 #include "FileNotifier.h"
-#include "AgentCommon.h"
 #include "GetLocalCfg.h"
 #include "Log.h"
 

@@ -407,7 +407,7 @@ INT32 GetFlowInfoFromConfigFile(string dip, ServerFlowKey_S *pstNewServerFlowKey
         pstNewServerFlowKey->uiDscp = pcAgentCfg->getDscp();
         pstNewServerFlowKey->uiSrcPortMin = 32769;
         pstNewServerFlowKey->uiSrcPortMax = 32868;
-        pstNewServerFlowKey->uiSrcPortRange = 5;
+        pstNewServerFlowKey->uiSrcPortRange = 1;
 
         pstNewServerFlowKey->stServerTopo.uiSvid = 0;
         pstNewServerFlowKey->stServerTopo.uiDvid = 0;
