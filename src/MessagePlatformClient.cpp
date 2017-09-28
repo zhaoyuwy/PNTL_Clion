@@ -198,7 +198,6 @@ INT32 ReportDataToServer(ServerAntAgentCfg_C *pcAgentCfg, stringstream *pstrRepo
     ssBasicToken.clear();
     ssBasicToken << pcAgentCfg->GetKafkaBasicToken();
 
-    cout << "######################################## basicToken" << ssBasicToken << endl;
     ssResponceData.clear();
     ssResponceData.str("");
     iRet = HttpPostData(&ssUrl, pstrReportData, &ssResponceData);

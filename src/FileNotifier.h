@@ -24,7 +24,7 @@
 using namespace std;
 
 const UINT32 BUF_LEN = 128;
-const string filePath = "/opt/huawei/ServerAntAgent/agentConfig.cfg";
+const string filePath = "./agentConfig.cfg";
 
 class FileNotifier_C : ThreadClass_C {
 private:
