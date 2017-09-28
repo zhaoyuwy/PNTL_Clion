@@ -697,7 +697,7 @@ INT32 FlowManager_C::FlowPrepareReport(UINT32 uiFlowTableIndex) {
 
 // 丢包上报接口
 INT32 FlowManager_C::FlowDropReport(UINT32 uiFlowTableIndex, UINT32 bigPkgSize) {
-    INT32 iRet = AGENT_OK;
+    INT32 iRet;
     AgentFlowTableEntry_S *pstAgentFlowEntry = NULL;
     stringstream ssReportData; // 用于生成json格式上报数据
 
@@ -733,7 +733,7 @@ INT32 FlowManager_C::FlowDropReport(UINT32 uiFlowTableIndex, UINT32 bigPkgSize) 
 
 // 延时上报接口
 INT32 FlowManager_C::FlowLatencyReport(UINT32 uiFlowTableIndex, UINT32 maxDelay, UINT32 bigPkgSize) {
-    INT32 iRet = AGENT_OK;
+    INT32 iRet;
     AgentFlowTableEntry_S *pstAgentFlowEntry = NULL;
     stringstream ssReportData; // 用于生成json格式上报数据
     string strReportData;       // 用于缓存用于上报的字符串信息

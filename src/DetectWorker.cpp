@@ -84,7 +84,7 @@ DetectWorker_C::DetectWorker_C()
     clock_gettime(CLOCK_REALTIME, &ts);
     srandom(ts.tv_nsec + ts.tv_sec); //用时间做随机数种子
     // 随机数返回值介于0 - RAND_MAX
-    uiSequenceNumber = random() % ((UINT32)(-1));
+    uiSequenceNumber = random() % ((u_int16_t)(-1));
 
     uiHandlerDefaultInterval = HANDELER_DEFAULT_INTERVAL; //默认1s响应周期, 降低CPU占用率.
 
@@ -117,8 +117,8 @@ DetectWorker_C::~DetectWorker_C()
 
 }
 
-extern bool IS_DEBUG = true;
-//extern bool IS_DEBUG = false;
+//extern bool IS_DEBUG = true;
+extern bool IS_DEBUG = false;
 // Thread回调函数.
 // PreStopHandler()执行后, ThreadHandler()需要在GetCurrentInterval() us内主动退出.
 INT32 DetectWorker_C::ThreadHandler()
@@ -295,26 +295,8 @@ INT32 DetectWorker_C::ThreadHandler()
                     break;
 //                    add ICMP recv
                 case AGENT_DETECT_PROTOCOL_ICMP:
-                    // 清空对端地址, payload buffer.
-                    sal_memset(&stPrtnerAddr, 0, sizeof(stPrtnerAddr));
-                    sal_memset(&stSendMsg, 0, sizeof(PacketInfo_S));
-                    sal_memset(acCmsgBuf, 0, sizeof(acCmsgBuf));
-                    iTos = 0;
 
-                    /*
-                       老版本的Linux kernel, sendmsg时不支持设定tos, recvmsg支持获取tos.
-                       为了兼容老版本, sendmsg时去除msg_control信息, recvmsg时添加msg_control信息.
-                    */
-                    // 报文附加信息buffer
-                    msg.msg_control = acCmsgBuf;
-                    msg.msg_controllen = sizeof(acCmsgBuf);
-
-                    // 接收报文
-//                    iRet = recvmsg(iSockFd, &msg, 0);
-
-//                    struct sockaddr_in m_from_addr;
-//                    socklen_t fromlen = sizeof(m_from_addr);
-
+//jieshou bao wen
                     iRet = recvfrom(iSockFd, &m_recvpacket,sizeof(m_recvpacket),0, (struct sockaddr *)&m_from_addr,&fromlen);
                     DETECT_WORKER_INFO("$$$$$$$$$$$$$$$$ Recived uiIsBigPkg Msg size [%d]    [%d]", iRet,sizeof(m_recvpacket));
 //                    if (iRet == sizeof(PacketInfo_S) || iRet == sizeof(aucBuffer)||iRet==sizeof(m_recvpacket))
@@ -339,6 +321,10 @@ INT32 DetectWorker_C::ThreadHandler()
                         printf("$$$$$$$$$$$$$$$$$$$$$$$$$ 444444    stT1.uiSec  %u,   stT1.uiUSec = %u\n",pstSendMsg->stT1.uiSec,pstSendMsg->stT1.uiUsec);
                         printf("$$$$$$$$$$$$$$$$$$$$$$$$$ 444444    stT4.uiSec=  %u,   stT4.uiUSec = %u\n",pstSendMsg->stT4.uiSec,pstSendMsg->stT4.uiUsec);
                         printf("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$rtt time is %d\n",pstSendMsg->stT4-pstSendMsg->stT1);
+
+                    DETECT_WORKER_INFO("stT1.uiSec = %u  stT1.uiUSec ＝ %u ", pstSendMsg->stT1.uiSec,pstSendMsg->stT1.uiUsec);
+                    DETECT_WORKER_INFO("stT4.uiSec = %u  stT4.uiUSec ＝ %u ", pstSendMsg->stT4.uiSec,pstSendMsg->stT4.uiUsec);
+                    DETECT_WORKER_INFO("rtt = %d ", pstSendMsg->stT4-pstSendMsg->stT1);
                         iRet = RxUpdateSession(pstSendMsg); //刷新sender的会话列表
                         if ((AGENT_OK!= iRet) && (AGENT_E_NOT_FOUND != iRet))
                             DETECT_WORKER_WARNING("RX: Update Session failed. iRet:[%d]", iRet);
@@ -375,10 +361,7 @@ INT32 DetectWorker_C::PreStopHandler()
 
 INT32 DetectWorker_C::InitCfg(WorkerCfg_S stNewWorker)
 {
-    m_maxPacketSize = 4;
-    m_datalen = 56;
-    m_nsend = 0;
-    m_nreceived = 0;
+//    m_datalen = 56;
     m_icmp_seq = 0;
     switch (stNewWorker.eProtocol)
     {
@@ -508,8 +491,6 @@ INT32 DetectWorker_C::InitSocket()
 
     ReleaseSocket();
     struct protoent *protocol;
-    m_nsend = 0;
-    m_nreceived = 0;
     // 根据协议类型, 创建对应socket.
     int size = 50*1024;
     switch (stCfg.eProtocol)
@@ -607,8 +588,7 @@ INT32 DetectWorker_C::RxUpdateSession
 }
 
 // TX发送报文结束后刷新会话状态
-INT32 DetectWorker_C::TxUpdateSession
-(DetectWorkerSession_S* pNewSession)
+INT32 DetectWorker_C::TxUpdateSession(DetectWorkerSession_S* pNewSession)
 {
     INT32 iRet = AGENT_E_NOT_FOUND;
 
@@ -799,8 +779,6 @@ bool DetectWorker_C::unpackIcmp(char *buf,int len, struct IcmpEchoReply *icmpEch
 
 
 //    PacketHtoN(pstSendMsg);
-    double rtt;
-
     ip = (struct ip *)buf;
     iphdrlen = ip->ip_hl << 2;    /*求ip报头长度,即ip报头的长度标志乘4*/
     icmp = (struct icmp *)(buf + iphdrlen);  /*越过ip报头,指向ICMP报头*/
@@ -814,15 +792,15 @@ bool DetectWorker_C::unpackIcmp(char *buf,int len, struct IcmpEchoReply *icmpEch
         return false;
     }
     /*确保所接收的是我所发的的ICMP的回应*/
-    if( (icmp->icmp_type==ICMP_ECHOREPLY) && (icmp->icmp_id == m_pid) )
-    {
 
-        tvsend=(struct timeval *)icmp->icmp_data;
         PacketInfo_S *pstSendMsgTemp= (PacketInfo_S*)(icmp->icmp_data);
+    printf("icmp->icmp_id == %d, m_pid = %d\n",icmp->icmp_id,m_pid);
+    printf("icmp->icmp_seq == %d, pstSendMsgTemp->uiSequenceNumber = %d\n",icmp->icmp_seq,pstSendMsgTemp->uiSequenceNumber);
+    if( (icmp->icmp_type==ICMP_ECHOREPLY) && (icmp->icmp_seq == pstSendMsgTemp->uiSequenceNumber) )
+    {
 
         gettimeofday(&tvrecv,NULL);  /*记录接收时间*/
         pstSendMsg->stT1;
-        tvresult = tvSub(tvrecv, *tvsend);  /*接收和发送的时间差*/
 
         pstSendMsgTemp->stT4.uiSec = tvrecv.tv_sec;
         pstSendMsgTemp->stT4.uiUsec = tvrecv.tv_usec;
@@ -842,19 +820,6 @@ bool DetectWorker_C::unpackIcmp(char *buf,int len, struct IcmpEchoReply *icmpEch
     else {
         return false;
     }
-}
-/*两个timeval结构相减*/
-struct timeval DetectWorker_C::tvSub(struct timeval timeval1,struct timeval timeval2)
-{
-    struct timeval result;
-    result = timeval1;
-    if (result.tv_usec < timeval2.tv_usec < 0)
-    {
-        --result.tv_sec;
-        result.tv_usec += 1000000;
-    }
-    result.tv_sec -= timeval2.tv_sec;
-    return result;
 }
 
 /*校验和算法*/
@@ -888,23 +853,19 @@ int DetectWorker_C::packIcmp(int pack_no, struct icmp* icmp,PacketInfo_S* pstSen
     struct icmp *picmp;
 //    struct timeval *tval;
 
+    printf("send pack_no = %d \n",pack_no);
     picmp = icmp;
     picmp->icmp_type=ICMP_ECHO;
     picmp->icmp_code=0;
     picmp->icmp_cksum=0;
-    picmp->icmp_seq=pack_no;
-    picmp->icmp_id= m_pid;
-    packsize= 8 + m_datalen;
-//    pstSendMsg= (PacketInfo_S*)(*icmp->icmp_data);
-//    pstSendMsg= (PacketInfo_S*)(*icmp->icmp_data);
-//    (PacketInfo_S*) icmp->icmp_data = pstSendMsg;
+    printf("send uiSequenceNumber  pstSendMsg->uiSequenceNumber = %d\n",pstSendMsg->uiSequenceNumber);
+    picmp->icmp_seq=pstSendMsg->uiSequenceNumber;
+    picmp->icmp_id= 0;
+    printf("send picmp->icmp_id  picmp->icmp_seq= %d\n",picmp->icmp_seq);
+    packsize= 8 + 56;
     memcpy(&icmp->icmp_data,pstSendMsg,sizeof(PacketInfo_S));
 
-    printf("@@@@@@@@@@@@@@@@@@@@@@@@@@@ %ul\n",sizeof(PacketInfo_S));
-    printf("@@@@@@@@@@@@@@@@MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM@@@@@@@@@@@ %ul\n",sizeof(timeval));
 
-//    gettimeofday(tval,NULL);    /*记录发送时间*/
-//    printf("tval->tv_sec %s, tval->tv_usec %s",tval->tv_sec,tval->tv_usec);
     picmp->icmp_cksum=getChksum((unsigned short *)icmp,packsize); /*校验算法*/
 //    PacketNtoH((PacketInfo_S*)icmp->icmp_data);
     return packsize;

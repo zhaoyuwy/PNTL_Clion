@@ -164,14 +164,7 @@ struct IcmpEchoReply {
     std::string fromAddr;
     bool isReply;
 };
-struct PingResult {
-    int dataLen;
-    int nsend;
-    int nreceived;
-    std::string ip;
-    std::string error;
-    std::vector<IcmpEchoReply> icmpEchoReplys;
-};
+
 // DetectWorker 会话信息
 typedef struct tagDetectWorkerSession
 {
@@ -220,10 +213,10 @@ private:
     UINT32 uiHandlerDefaultInterval;          // Handler状态刷新默认周期, 单位为us
     INT32 RxUpdateSession
             (PacketInfo_S * pstPakcet);                 // Rx任务收到应答报文后, 通知worker刷新会话列表, Rx任务使用
-    struct timeval tvSub(struct timeval timeval1,struct timeval timeval2);
 public:
     DetectWorker_C();                               // 构造函数, 填充默认值.
     ~DetectWorker_C();                              // 析构函数, 释放必要资源.
+    unsigned short getChksum(unsigned short *addr,int len);
     ServerAntAgentCfg_C * pcAgentCfg;                   // agent_cfg
     INT32 Init(WorkerCfg_S stNewWorker, ServerAntAgentCfg_C *pcNewAgentCfg);         // 根据入参完成对象初始化, FlowManage使用.
     INT32 PushSession(FlowKey_S stNewFlow);           // 添加探测任务, FlowManage使用.
@@ -231,19 +224,11 @@ public:
     pOldSession);               // 查询探测结果, FlowManage使用.
 
     int packIcmp(int pack_no, struct icmp* icmp,PacketInfo_S* stSendMsg);
-    unsigned short getChksum(unsigned short *addr,int len);
     bool unpackIcmp(char *buf,int len, struct IcmpEchoReply *icmpEchoReply,PacketInfo_S *pstSendMsg);
-    INT32 m_nsend;
     INT32 m_icmp_seq ;
 
     char m_sendpacket[PACKET_SIZE];
     char m_recvpacket[PACKET_SIZE];
-    int m_maxPacketSize;
-    int m_sockfd;
-    int m_datalen;
-    int m_nreceived;
-    struct sockaddr_in m_dest_addr;
-    struct sockaddr_in m_from_addr;
     pid_t m_pid;
 };
 #endif //PNTL_AGENT_DETECTWORKER_H
